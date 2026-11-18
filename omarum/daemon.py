@@ -45,8 +45,16 @@ class Daemon:
         self._runner: asyncio.Task | None = None
         self._watchdog: asyncio.Task | None = None
         self._listening_since = time.monotonic()
+        self._session = 0  # bumps on every start/end; stale sessions' events are dropped
 
     # -- events from the pipeline -------------------------------------------
+    def _emitter(self, session: int):
+        def emit(msg: dict) -> None:
+            if session == self._session:
+                self.on_event(msg)
+
+        return emit
+
     def on_event(self, msg: dict) -> None:
         if msg.get("type") == "state":
             new = msg["state"]
@@ -100,7 +108,9 @@ class Daemon:
             return self._reply(ok=False)
         self._starting = True
         try:
-            task, self._stop = await asyncio.to_thread(self._factory, self.cfg, self.on_event)
+            self._session += 1
+            emit = self._emitter(self._session)
+            task, self._stop = await asyncio.to_thread(self._factory, self.cfg, emit)
         except Exception as exc:  # no mic, model load failure, ...
             logger.exception("could not start a session")
             self._set_state("error", str(exc))
@@ -131,6 +141,7 @@ class Daemon:
         if not self._active:
             return self._reply()
         runner = self._runner
+        self._session += 1  # from now on, this session's events are ignored
         if self._stop:
             await self._stop()
         try:

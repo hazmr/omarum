@@ -151,3 +151,16 @@ def test_claude_service_settings_complete():
     svc = ClaudeCodeLLMService(model="haiku", system_prompt="hi")
     assert svc._settings.model == "haiku"
     assert svc._settings.temperature is None
+
+
+async def test_late_events_from_closed_session_are_ignored():
+    f = FakeFactory()
+    d = make(f)
+    await d.handle({"cmd": "start"})
+    old_emit = f.emit
+    await d.handle({"cmd": "toggle"})
+    assert d.state == "closed"
+    old_emit({"type": "state", "state": "speaking"})
+    old_emit({"type": "level", "who": "companion", "value": 0.9})
+    assert d.state == "closed"
+    assert d.hub.sent[-1] == {"type": "state", "state": "closed"}

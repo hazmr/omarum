@@ -7,7 +7,6 @@ from typing import Awaitable, Callable
 
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.frames.frames import EndFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
@@ -75,7 +74,8 @@ def build_pipeline(cfg: Config, emit: Emit) -> tuple[PipelineTask, Callable[[], 
     task = PipelineTask(pipeline, params=PipelineParams(enable_metrics=False))
 
     async def stop() -> None:
-        await task.queue_frame(EndFrame())
+        # Cancel, don't EndFrame: an EndFrame waits for queued speech to finish playing.
+        await task.cancel(reason="closed by user")
 
     return task, stop
 
