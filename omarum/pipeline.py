@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from typing import Awaitable, Callable
 
 from loguru import logger
@@ -14,7 +15,6 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
-from pipecat.services.piper.tts import PiperTTSService
 from pipecat.services.whisper.stt import WhisperSTTService
 from pipecat.transports.local.audio import LocalAudioTransport, LocalAudioTransportParams
 
@@ -22,6 +22,7 @@ from omarum import persona
 from omarum.claude_code_llm import DATA_DIR, ClaudeCodeLLMService
 from omarum.config import Config
 from omarum.levels import LatencyClock, StateTap
+from omarum.voices import build_tts, load_env_file
 from omarum.turns import mute_strategies, turn_strategies, vad_params
 from omarum.models import pick_whisper, resolve_whisper_model
 
@@ -47,10 +48,7 @@ def build_pipeline(cfg: Config, emit: Emit) -> tuple[PipelineTask, Callable[[], 
         system_prompt=persona.render(cfg),
         on_error=lambda reason: emit({"type": "state", "state": "error", "reason": reason}),
     )
-    tts = PiperTTSService(
-        settings=PiperTTSService.Settings(voice=cfg.piper_voice),
-        download_dir=DATA_DIR / "models" / "piper",
-    )
+    tts = build_tts(cfg, {**load_env_file(), **os.environ})
     context = LLMContext()
     aggregators = LLMContextAggregatorPair(
         context,

@@ -22,6 +22,10 @@ class Config:
     whisper_model: str = "large-v3-turbo"
     whisper_device: str = "auto"  # auto | cuda | cpu
     whisper_cpu_model: str = "base.en"
+    voice_primary: str = "elevenlabs"  # elevenlabs | kokoro | piper (cloud falls back to kokoro)
+    elevenlabs_voice_id: str = "21m00Tcm4TlvDq8ikWAM"  # premade "Rachel"; change in config.toml
+    elevenlabs_model: str = "eleven_flash_v2_5"
+    kokoro_voice: str = "af_heart"
     piper_voice: str = "en_US-amy-medium"
     vad_stop_secs: float = 0.6
     vad_confidence: float = 0.8
