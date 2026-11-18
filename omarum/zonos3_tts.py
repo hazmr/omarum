@@ -55,10 +55,21 @@ def start_server(port: int) -> subprocess.Popen | None:
         return None
     log = open(Path.home() / ".local" / "state" / "omarum" / "zonos3.log", "ab")
     args = [str(binary), str(GGML_DIR / "gguf" / "backbone-ptq.gguf"), "--port", str(port)]
+    if binary.parent.name in ("build-vulkan", "build-cuda"):
+        args.append("--gpu")  # Vulkan (e.g. Radeon iGPU) or CUDA: ~3x faster decode than CPU
     voices = GGML_DIR / "gguf" / "voices"
     if voices.is_dir():
         args += ["--tts-default-voices-dir", str(voices)]
-    return subprocess.Popen(args, cwd=GGML_DIR, stdout=log, stderr=subprocess.STDOUT)
+    return subprocess.Popen(args, cwd=GGML_DIR, stdout=log, stderr=subprocess.STDOUT, preexec_fn=_die_with_parent)
+
+
+def _die_with_parent() -> None:
+    """Linux: SIGTERM this child when the daemon exits, however it exits."""
+    import ctypes
+    import signal
+
+    PR_SET_PDEATHSIG = 1
+    ctypes.CDLL("libc.so.6", use_errno=True).prctl(PR_SET_PDEATHSIG, signal.SIGTERM)
 
 
 def make_service(base_url: str, voice: str, language: str):

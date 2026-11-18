@@ -23,6 +23,8 @@ hyprctl reload >/dev/null
 # (Re)start the daemon and the orb in the background.
 pkill -f "^[^ ]*python[^ ]* [^ ]*/bin/omarum daemon" 2>/dev/null || true
 pkill -f "^/usr/bin/python3 [^ ]*/orb/omarum_orb.py" 2>/dev/null || true
+pkill -f "^[^ ]*/zonos3-server " 2>/dev/null || true
+sleep 1
 mkdir -p "$HOME/.local/state/omarum"
 uwsm app -- "$omarum_bin" daemon >"$HOME/.local/state/omarum/daemon.log" 2>&1 &
 uwsm app -- "$repo/bin/omarum-orb" >"$HOME/.local/state/omarum/orb.log" 2>&1 &

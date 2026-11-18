@@ -168,8 +168,14 @@ async def run_daemon() -> None:
     zonos = zonos3_tts.start_server(cfg.zonos3_port) if cfg.voice_primary in ("elevenlabs", "zonos3") else None
     if zonos:
         logger.info(f"zonos3-server started (pid {zonos.pid}) on port {cfg.zonos3_port}")
+    import signal
+
+    stop = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(sig, stop.set)
     try:
-        await asyncio.Event().wait()
+        await stop.wait()
     finally:
         await hub.close()
         if zonos:
