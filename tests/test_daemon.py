@@ -119,3 +119,35 @@ def test_cli_no_daemon_exit_1(tmp_path, monkeypatch, capsys):
         cli.main(["toggle"])
     assert e.value.code == 1
     assert capsys.readouterr().err.strip() == "omarum: daemon not running (start it with: omarum daemon)"
+
+
+def test_cli_waits_long_enough_for_session_start(monkeypatch, capsys):
+    seen = {}
+
+    def fake_send(cmd, path, timeout=2.0):
+        seen["timeout"] = timeout
+        return {"ok": True, "state": "listening"}
+
+    monkeypatch.setattr("omarum.cli.send_command", fake_send)
+    with pytest.raises(SystemExit):
+        cli.main(["toggle"])
+    assert seen["timeout"] >= 15
+
+
+def test_cli_timeout_prints_busy(monkeypatch, capsys):
+    def slow(cmd, path, timeout=2.0):
+        raise TimeoutError
+
+    monkeypatch.setattr("omarum.cli.send_command", slow)
+    with pytest.raises(SystemExit) as e:
+        cli.main(["status"])
+    assert e.value.code == 1
+    assert "not responding" in capsys.readouterr().err
+
+
+def test_claude_service_settings_complete():
+    from omarum.claude_code_llm import ClaudeCodeLLMService
+
+    svc = ClaudeCodeLLMService(model="haiku", system_prompt="hi")
+    assert svc._settings.model == "haiku"
+    assert svc._settings.temperature is None

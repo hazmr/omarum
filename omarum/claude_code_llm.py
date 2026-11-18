@@ -22,6 +22,7 @@ from pipecat.frames.frames import (
 )
 from pipecat.processors.frame_processor import FrameDirection
 from pipecat.services.llm_service import LLMService
+from pipecat.services.settings import LLMSettings
 
 DATA_DIR = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share")) / "omarum"
 
@@ -81,7 +82,13 @@ def last_user_text(messages: list) -> str:
 
 class ClaudeCodeLLMService(LLMService):
     def __init__(self, *, model: str, system_prompt: str, on_error=None, **kwargs) -> None:
-        super().__init__(**kwargs)
+        # Claude Code owns sampling; declare every setting so pipecat doesn't complain.
+        settings = LLMSettings(
+            model=model, system_instruction=system_prompt, temperature=None, max_tokens=None,
+            top_p=None, top_k=None, frequency_penalty=None, presence_penalty=None, seed=None,
+            filter_incomplete_user_turns=None, user_turn_completion_config=None,
+        )
+        super().__init__(settings=settings, **kwargs)
         self._on_error = on_error
         self._model = model
         self._system_prompt = system_prompt

@@ -23,10 +23,15 @@ def main(argv: list[str] | None = None) -> None:
             pass
         return
 
+    # Starting a session loads Whisper and the voice, which can take several seconds.
+    timeout = 2.0 if args.command == "status" else 20.0
     try:
-        reply = send_command(args.command, SOCKET_PATH)
+        reply = send_command(args.command, SOCKET_PATH, timeout=timeout)
     except DaemonNotRunning:
         print("omarum: daemon not running (start it with: omarum daemon)", file=sys.stderr)
+        sys.exit(1)
+    except TimeoutError:
+        print("omarum: daemon not responding", file=sys.stderr)
         sys.exit(1)
     line = reply.get("state", "?")
     if reply.get("reason"):
