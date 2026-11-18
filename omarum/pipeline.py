@@ -23,6 +23,7 @@ from omarum import persona
 from omarum.claude_code_llm import DATA_DIR, ClaudeCodeLLMService
 from omarum.config import Config
 from omarum.levels import LatencyClock, StateTap
+from omarum.models import resolve_whisper_model
 
 Emit = Callable[[dict], None]
 
@@ -33,7 +34,7 @@ def build_pipeline(cfg: Config, emit: Emit) -> tuple[PipelineTask, Callable[[], 
         LocalAudioTransportParams(audio_in_enabled=True, audio_out_enabled=True)
     )
     stt = WhisperSTTService(
-        settings=WhisperSTTService.Settings(model=cfg.whisper_model),
+        settings=WhisperSTTService.Settings(model=resolve_whisper_model(cfg.whisper_model)),
         device=cfg.whisper_device,
     )
     llm = ClaudeCodeLLMService(
