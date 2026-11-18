@@ -23,3 +23,18 @@ def test_vad_is_stricter_than_pipecat_defaults():
     assert p.start_secs == 0.3
     assert p.min_volume == 0.7
     assert p.stop_secs == 0.6
+
+
+def test_mic_muted_while_rum_speaks_by_default():
+    from pipecat.turns.user_mute.always_user_mute_strategy import AlwaysUserMuteStrategy
+
+    from omarum.turns import mute_strategies
+
+    s = mute_strategies(Config())
+    assert len(s) == 1 and isinstance(s[0], AlwaysUserMuteStrategy)
+
+
+def test_mute_can_be_disabled_for_echo_cancelled_setups():
+    from omarum.turns import mute_strategies
+
+    assert mute_strategies(Config(mute_while_speaking=False)) == []

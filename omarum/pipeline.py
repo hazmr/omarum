@@ -23,7 +23,7 @@ from omarum import persona
 from omarum.claude_code_llm import DATA_DIR, ClaudeCodeLLMService
 from omarum.config import Config
 from omarum.levels import LatencyClock, StateTap
-from omarum.turns import turn_strategies, vad_params
+from omarum.turns import mute_strategies, turn_strategies, vad_params
 from omarum.models import pick_whisper, resolve_whisper_model
 
 Emit = Callable[[dict], None]
@@ -58,6 +58,7 @@ def build_pipeline(cfg: Config, emit: Emit) -> tuple[PipelineTask, Callable[[], 
         user_params=LLMUserAggregatorParams(
             vad_analyzer=SileroVADAnalyzer(params=vad_params(cfg)),
             user_turn_strategies=turn_strategies(cfg),
+            user_mute_strategies=mute_strategies(cfg),
         ),
     )
     pipeline = Pipeline([

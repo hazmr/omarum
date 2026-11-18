@@ -28,6 +28,7 @@ class Config:
     vad_start_secs: float = 0.3
     vad_min_volume: float = 0.7
     interrupt_min_words: int = 3
+    mute_while_speaking: bool = True  # stops Rum hearing itself without echo cancellation
     whisper_no_speech_prob: float = 0.3
     idle_timeout_secs: float = 8.0
     orb_position: str = "top-right"

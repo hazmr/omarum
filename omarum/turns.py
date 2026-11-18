@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.turns.user_start.min_words_user_turn_start_strategy import MinWordsUserTurnStartStrategy
+from pipecat.turns.user_mute.always_user_mute_strategy import AlwaysUserMuteStrategy
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
 
 from omarum.config import Config
@@ -22,3 +23,8 @@ def vad_params(cfg: Config) -> VADParams:
         stop_secs=cfg.vad_stop_secs,
         min_volume=cfg.vad_min_volume,
     )
+
+
+def mute_strategies(cfg: Config) -> list:
+    """Without echo cancellation the mic hears Rum's own voice, so mute it while Rum talks."""
+    return [AlwaysUserMuteStrategy()] if cfg.mute_while_speaking else []
