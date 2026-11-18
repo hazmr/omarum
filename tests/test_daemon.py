@@ -1,0 +1,121 @@
+import asyncio
+import time
+
+import pytest
+
+from omarum import cli
+from omarum.claude_code_llm import BrainUnavailable
+from omarum.config import Config
+from omarum.daemon import Daemon
+
+
+class FakeHub:
+    def __init__(self):
+        self.sent = []
+
+    def broadcast(self, msg):
+        self.sent.append(msg)
+
+
+class FakeFactory:
+    """Stands in for build_pipeline: records starts; the 'task' runs until stopped."""
+
+    def __init__(self, build_delay=0.0, fail=None):
+        self.starts = 0
+        self.stops = 0
+        self.build_delay = build_delay
+        self.fail = fail
+        self.emit = None
+
+    def __call__(self, cfg, emit):
+        time.sleep(self.build_delay)
+        if self.fail:
+            raise self.fail
+        self.starts += 1
+        self.emit = emit
+        done = asyncio.Event()
+
+        async def stop():
+            self.stops += 1
+            done.set()
+
+        return done, stop
+
+
+async def fake_run(task):
+    await task.wait()
+
+
+@pytest.fixture(autouse=True)
+def claude_on_path(monkeypatch):
+    monkeypatch.setattr("omarum.daemon.shutil.which", lambda name: "/usr/bin/claude")
+
+
+def make(factory, **cfg):
+    return Daemon(Config(**cfg), FakeHub(), pipeline_factory=factory, run_task=fake_run)
+
+
+async def test_toggle_starts_then_stops():
+    f = FakeFactory()
+    d = make(f)
+    r = await d.handle({"cmd": "toggle"})
+    assert r["ok"] and d.state == "listening" and f.starts == 1
+    r = await d.handle({"cmd": "toggle"})
+    assert d.state == "closed" and f.stops == 1
+
+
+async def test_double_toggle_while_starting_single_session():
+    f = FakeFactory(build_delay=0.2)
+    d = make(f)
+    await asyncio.gather(d.handle({"cmd": "toggle"}), d.handle({"cmd": "toggle"}))
+    assert f.starts == 1
+    assert d.state == "listening"
+
+
+async def test_missing_claude_cli_errors_without_crash(monkeypatch):
+    monkeypatch.setattr("omarum.daemon.shutil.which", lambda name: None)
+    d = make(FakeFactory())
+    r = await d.handle({"cmd": "toggle"})
+    assert r["ok"] is False and r["state"] == "error" and "claude" in r["reason"]
+    r = await d.handle({"cmd": "status"})
+    assert r["state"] == "error"
+
+
+async def test_factory_exception_sets_error():
+    d = make(FakeFactory(fail=RuntimeError("no microphone")))
+    r = await d.handle({"cmd": "start"})
+    assert r["ok"] is False and d.state == "error" and "no microphone" in r["reason"]
+
+
+async def test_brain_unavailable_sets_error():
+    f = FakeFactory()
+    d = make(f)
+    await d.handle({"cmd": "start"})
+    f.emit({"type": "state", "state": "error", "reason": str(BrainUnavailable("usage limit reached"))})
+    r = await d.handle({"cmd": "status"})
+    assert r["state"] == "error" and "usage limit" in r["reason"]
+
+
+async def test_idle_timeout_closes_session():
+    f = FakeFactory()
+    d = make(f, idle_timeout_secs=0.1)
+    await d.handle({"cmd": "start"})
+    await asyncio.sleep(0.4)
+    assert d.state == "closed" and f.stops == 1
+
+
+async def test_listening_does_not_override_user_speaking():
+    f = FakeFactory()
+    d = make(f)
+    await d.handle({"cmd": "start"})
+    f.emit({"type": "state", "state": "user_speaking"})
+    f.emit({"type": "state", "state": "listening"})
+    assert d.state == "user_speaking"
+
+
+def test_cli_no_daemon_exit_1(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr("omarum.cli.SOCKET_PATH", tmp_path / "missing.sock")
+    with pytest.raises(SystemExit) as e:
+        cli.main(["toggle"])
+    assert e.value.code == 1
+    assert capsys.readouterr().err.strip() == "omarum: daemon not running (start it with: omarum daemon)"
