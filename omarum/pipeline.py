@@ -7,7 +7,6 @@ from typing import Awaitable, Callable
 
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import EndFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.task import PipelineParams, PipelineTask
@@ -24,6 +23,7 @@ from omarum import persona
 from omarum.claude_code_llm import DATA_DIR, ClaudeCodeLLMService
 from omarum.config import Config
 from omarum.levels import LatencyClock, StateTap
+from omarum.turns import turn_strategies, vad_params
 from omarum.models import pick_whisper, resolve_whisper_model
 
 Emit = Callable[[dict], None]
@@ -37,7 +37,9 @@ def build_pipeline(cfg: Config, emit: Emit) -> tuple[PipelineTask, Callable[[], 
     model, device, compute = pick_whisper(cfg)
     logger.info(f"whisper: {model} on {device}")
     stt = WhisperSTTService(
-        settings=WhisperSTTService.Settings(model=resolve_whisper_model(model)),
+        settings=WhisperSTTService.Settings(
+            model=resolve_whisper_model(model), no_speech_prob=cfg.whisper_no_speech_prob
+        ),
         device=device,
         compute_type=compute,
     )
@@ -54,7 +56,8 @@ def build_pipeline(cfg: Config, emit: Emit) -> tuple[PipelineTask, Callable[[], 
     aggregators = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
-            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=cfg.vad_stop_secs)),
+            vad_analyzer=SileroVADAnalyzer(params=vad_params(cfg)),
+            user_turn_strategies=turn_strategies(cfg),
         ),
     )
     pipeline = Pipeline([

@@ -24,6 +24,11 @@ class Config:
     whisper_cpu_model: str = "base.en"
     piper_voice: str = "en_US-amy-medium"
     vad_stop_secs: float = 0.6
+    vad_confidence: float = 0.8
+    vad_start_secs: float = 0.3
+    vad_min_volume: float = 0.7
+    interrupt_min_words: int = 3
+    whisper_no_speech_prob: float = 0.3
     idle_timeout_secs: float = 8.0
     orb_position: str = "top-right"
 
