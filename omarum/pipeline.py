@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from typing import Awaitable, Callable
 
+from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import EndFrame
@@ -23,7 +24,7 @@ from omarum import persona
 from omarum.claude_code_llm import DATA_DIR, ClaudeCodeLLMService
 from omarum.config import Config
 from omarum.levels import LatencyClock, StateTap
-from omarum.models import resolve_whisper_model
+from omarum.models import pick_whisper, resolve_whisper_model
 
 Emit = Callable[[dict], None]
 
@@ -33,9 +34,12 @@ def build_pipeline(cfg: Config, emit: Emit) -> tuple[PipelineTask, Callable[[], 
     transport = LocalAudioTransport(
         LocalAudioTransportParams(audio_in_enabled=True, audio_out_enabled=True)
     )
+    model, device, compute = pick_whisper(cfg)
+    logger.info(f"whisper: {model} on {device}")
     stt = WhisperSTTService(
-        settings=WhisperSTTService.Settings(model=resolve_whisper_model(cfg.whisper_model)),
-        device=cfg.whisper_device,
+        settings=WhisperSTTService.Settings(model=resolve_whisper_model(model)),
+        device=device,
+        compute_type=compute,
     )
     llm = ClaudeCodeLLMService(
         model=cfg.brain_model,

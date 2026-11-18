@@ -20,7 +20,8 @@ class Config:
     user_name: str = field(default_factory=_default_user)
     brain_model: str = "haiku"
     whisper_model: str = "large-v3-turbo"
-    whisper_device: str = "cuda"
+    whisper_device: str = "auto"  # auto | cuda | cpu
+    whisper_cpu_model: str = "base.en"
     piper_voice: str = "en_US-amy-medium"
     vad_stop_secs: float = 0.6
     idle_timeout_secs: float = 8.0
