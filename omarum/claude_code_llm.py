@@ -89,6 +89,18 @@ class ClaudeCodeLLMService(LLMService):
         self._turns_sent = 0
         self._turns_done = 0
 
+    async def start(self, frame) -> None:
+        await super().start(frame)
+        await self._prewarm()
+
+    async def _prewarm(self) -> None:
+        """Spawn claude when the session starts, so the first reply skips startup."""
+        try:
+            await self._ensure_process()
+        except BrainUnavailable as exc:
+            if self._on_error:
+                self._on_error(str(exc))
+
     async def _ensure_process(self) -> asyncio.subprocess.Process:
         if self._proc and self._proc.returncode is None:
             return self._proc
