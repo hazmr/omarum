@@ -24,6 +24,7 @@ from gi.repository import GLib, Gtk  # noqa: E402
 from gi.repository import Gtk4LayerShell as LayerShell  # noqa: E402
 
 from omarum.ipc import SOCKET_PATH, decode, encode  # noqa: E402
+from omarum.orbstate import display_state, speaking_energy  # noqa: E402
 from omarum.theme import load_palette, state_color  # noqa: E402
 
 SIZE = 160
@@ -43,6 +44,7 @@ class Orb:
         self.color = self.palette["idle"]
         self.alpha = 0.0
         self.level_target = 0.0
+        self.user_level = 0.0  # recent mic loudness, decays each frame
         self.energy = 0.0
         self.error_since = 0.0
         self.t0 = time.monotonic()
@@ -54,11 +56,10 @@ class Orb:
             if self.state == "error":
                 self.error_since = time.monotonic()
         elif msg.get("type") == "level":
-            who = msg.get("who")
-            if (who == "user" and self.state in ("user_speaking", "listening")) or (
-                who == "companion" and self.state == "speaking"
-            ):
-                self.level_target = max(self.level_target, float(msg.get("value", 0)))
+            value = float(msg.get("value", 0))
+            if msg.get("who") == "user" and self.state in ("user_speaking", "listening"):
+                self.user_level = max(self.user_level, value)
+                self.level_target = max(self.level_target, value)
         return False  # one-shot GLib.idle_add
 
     def reload_theme(self) -> None:
@@ -71,9 +72,13 @@ class Orb:
         target_alpha = 1.0 if self.state in VISIBLE and not error_done else 0.0
         step = 1 / 12  # ~200 ms fade at 60 fps
         self.alpha = min(target_alpha, self.alpha + step) if target_alpha > self.alpha else max(target_alpha, self.alpha - step)
-        self.color = lerp(self.color, state_color(self.state, self.palette), 0.07)
+        shown = display_state(self.state, self.user_level)
+        self.color = lerp(self.color, state_color(shown, self.palette), 0.12)
+        if self.state == "speaking":  # companion audio arrives in big chunks: animate a voice-like rhythm
+            self.level_target = max(self.level_target, speaking_energy(now - self.t0))
         self.energy += (self.level_target - self.energy) * 0.15
         self.level_target *= 0.9
+        self.user_level *= 0.94  # ~0.5 s to fade below the threshold after you stop
 
     def draw(self, cr: cairo.Context, w: int, h: int) -> None:
         cr.set_operator(cairo.OPERATOR_CLEAR)

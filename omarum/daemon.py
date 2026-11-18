@@ -10,6 +10,7 @@ from typing import Awaitable, Callable
 from loguru import logger
 
 from omarum.config import Config
+from omarum.orbstate import USER_VOICE_THRESHOLD
 
 ACTIVE = {"listening", "user_speaking", "thinking", "speaking"}
 
@@ -62,6 +63,8 @@ class Daemon:
                 return  # the companion stopped because the user interrupted
             self._set_state(new, msg.get("reason"))
         else:
+            if msg.get("who") == "user" and msg.get("value", 0) >= USER_VOICE_THRESHOLD:
+                self._listening_since = time.monotonic()  # the user is talking: not idle
             self.hub.broadcast(msg)
 
     def _set_state(self, state: str, reason: str | None = None) -> None:

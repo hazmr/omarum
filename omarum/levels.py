@@ -9,11 +9,11 @@ from typing import Callable
 
 from loguru import logger
 from pipecat.frames.frames import (
+    BotStartedSpeakingFrame,
     BotStoppedSpeakingFrame,
     Frame,
     InputAudioRawFrame,
     OutputAudioRawFrame,
-    TTSStartedFrame,
     UserStartedSpeakingFrame,
     UserStoppedSpeakingFrame,
 )
@@ -86,8 +86,8 @@ class StateTap(FrameProcessor):
                 if self._clock.user_stopped_at is not None:
                     self._clock.companion_audio()
                 self._level(frame.audio)
-            elif isinstance(frame, TTSStartedFrame):
-                self._state("speaking")
+            elif isinstance(frame, BotStartedSpeakingFrame):
+                self._state("speaking")  # audio is actually playing (comes upstream from the transport)
             elif isinstance(frame, BotStoppedSpeakingFrame):
                 self._state("listening")
         await self.push_frame(frame, direction)

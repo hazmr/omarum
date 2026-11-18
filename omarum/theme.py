@@ -66,9 +66,19 @@ def load_palette(theme_dir: Path | None = None) -> dict[str, RGB]:
     return palette
 
 
+def vivid(rgb: RGB, boost: float = 2.2, min_saturation: float = 0.45) -> RGB:
+    """Same hue, more color: pastel theme colors read as gray on a glowing orb."""
+    import colorsys
+
+    h, l, s = colorsys.rgb_to_hls(*rgb)
+    s = min(1.0, max(s * boost, min_saturation))
+    l = min(l, 0.72)
+    return colorsys.hls_to_rgb(h, l, s)
+
+
 def state_color(state: str, palette: dict[str, RGB]) -> RGB:
     return {
-        "user_speaking": palette["user"],
-        "speaking": palette["companion"],
-        "error": palette["error"],
+        "user_speaking": vivid(palette["user"]),
+        "speaking": vivid(palette["companion"]),
+        "error": vivid(palette["error"]),
     }.get(state, palette["idle"])

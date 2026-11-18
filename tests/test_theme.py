@@ -30,9 +30,9 @@ def test_bad_toml_falls_back(tmp_path: Path):
 
 def test_state_color_mapping():
     p = theme.FALLBACK
-    assert theme.state_color("user_speaking", p) == p["user"]
-    assert theme.state_color("speaking", p) == p["companion"]
-    assert theme.state_color("error", p) == p["error"]
+    assert theme.state_color("user_speaking", p) == theme.vivid(p["user"])
+    assert theme.state_color("speaking", p) == theme.vivid(p["companion"])
+    assert theme.state_color("error", p) == theme.vivid(p["error"])
     for s in ("idle", "listening", "thinking", "closed"):
         assert theme.state_color(s, p) == p["idle"]
 
@@ -41,3 +41,20 @@ def test_theme_dir_uses_slug_when_display_name_dir_missing(tmp_path: Path):
     (tmp_path / "last-horizon").mkdir()
     assert theme.existing_theme_dir(tmp_path / "Last Horizon") == tmp_path / "last-horizon"
     assert theme.existing_theme_dir(tmp_path / "Nope Theme") is None
+
+
+def test_vivid_increases_saturation_but_keeps_hue():
+    import colorsys
+
+    rose = theme.FALLBACK["user"]
+    h1, l1, s1 = colorsys.rgb_to_hls(*rose)
+    h2, l2, s2 = colorsys.rgb_to_hls(*theme.vivid(rose))
+    assert abs(h1 - h2) < 0.01
+    assert s2 > s1 * 1.5
+
+
+def test_speaking_colors_are_vivid_idle_is_not():
+    p = theme.FALLBACK
+    assert theme.state_color("user_speaking", p) == theme.vivid(p["user"])
+    assert theme.state_color("speaking", p) == theme.vivid(p["companion"])
+    assert theme.state_color("listening", p) == p["idle"]

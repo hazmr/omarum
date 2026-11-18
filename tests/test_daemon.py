@@ -164,3 +164,15 @@ async def test_late_events_from_closed_session_are_ignored():
     old_emit({"type": "level", "who": "companion", "value": 0.9})
     assert d.state == "closed"
     assert d.hub.sent[-1] == {"type": "state", "state": "closed"}
+
+
+async def test_user_voice_keeps_session_alive():
+    f = FakeFactory()
+    d = make(f, idle_timeout_secs=0.3)
+    await d.handle({"cmd": "start"})
+    for _ in range(8):  # 0.4s of talking, longer than the idle timeout
+        f.emit({"type": "level", "who": "user", "value": 0.6})
+        await asyncio.sleep(0.05)
+    assert d.state == "listening"  # not closed while the user is talking
+    await asyncio.sleep(0.5)
+    assert d.state == "closed"  # silence afterwards still closes it

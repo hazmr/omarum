@@ -35,3 +35,18 @@ async def test_statetap_emits_user_speaking():
         expected_down_frames=[UserStartedSpeakingFrame],
     )
     assert {"type": "state", "state": "user_speaking"} in events
+
+
+async def test_companion_speaking_starts_when_audio_plays():
+    from pipecat.frames.frames import BotStartedSpeakingFrame
+    from pipecat.processors.frame_processor import FrameDirection
+
+    events: list[dict] = []
+    tap = StateTap(emit=events.append, who="companion", clock=LatencyClock())
+    await run_test(
+        tap,
+        frames_to_send=[BotStartedSpeakingFrame()],
+        frames_to_send_direction=FrameDirection.UPSTREAM,
+        expected_up_frames=[BotStartedSpeakingFrame],
+    )
+    assert {"type": "state", "state": "speaking"} in events
