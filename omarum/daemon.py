@@ -157,11 +157,20 @@ async def run_daemon() -> None:
     from omarum.config import load_config
     from omarum.ipc import SOCKET_PATH, EventHub
 
+    from omarum import zonos3_tts
+
+    cfg = load_config()
     hub = EventHub()
-    daemon = Daemon(load_config(), hub)
+    daemon = Daemon(cfg, hub)
     await hub.serve(SOCKET_PATH, daemon.handle)
     logger.info(f"omarum daemon listening on {SOCKET_PATH}")
+    # ZONOS3 keeps its model loaded in its own server; start it once with the daemon.
+    zonos = zonos3_tts.start_server(cfg.zonos3_port) if cfg.voice_primary in ("elevenlabs", "zonos3") else None
+    if zonos:
+        logger.info(f"zonos3-server started (pid {zonos.pid}) on port {cfg.zonos3_port}")
     try:
         await asyncio.Event().wait()
     finally:
         await hub.close()
+        if zonos:
+            zonos.terminate()

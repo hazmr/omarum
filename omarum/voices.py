@@ -1,4 +1,6 @@
-"""Rum's voice: a cloud voice first, a local open-source voice as the fallback."""
+"""Rum's voice. The user picks one; if it fails, Rum moves down this order:
+ElevenLabs (cloud) -> ZONOS3-Mini (local) -> Kokoro (local, always there).
+"""
 
 from __future__ import annotations
 
@@ -6,7 +8,8 @@ import os
 from pathlib import Path
 
 ENV_PATH = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "omarum" / "env"
-LOCAL_FALLBACK = "kokoro"
+ORDER = ["elevenlabs", "zonos3", "kokoro"]
+LAST_RESORT = "kokoro"
 
 
 def load_env_file(path: Path = ENV_PATH) -> dict[str, str]:
@@ -26,22 +29,54 @@ def load_env_file(path: Path = ENV_PATH) -> dict[str, str]:
     return env
 
 
-def voice_chain(cfg, env: dict[str, str]) -> list[str]:
-    """Which voices to try, in order. The cloud voice needs its key."""
-    if cfg.voice_primary == "elevenlabs":
-        return ["elevenlabs", LOCAL_FALLBACK] if env.get("ELEVENLABS_API_KEY") else [LOCAL_FALLBACK]
-    return [cfg.voice_primary]
+def available_voices(env: dict[str, str]) -> set[str]:
+    from omarum import zonos3_tts
+
+    have = {"kokoro"}
+    if env.get("ELEVENLABS_API_KEY"):
+        have.add("elevenlabs")
+    if zonos3_tts.is_installed():
+        have.add("zonos3")
+    return have
+
+
+def voice_chain(cfg, available: set[str]) -> list[str]:
+    """The chosen voice, then the ones after it in ORDER, skipping what isn't available."""
+    if cfg.voice_primary not in ORDER:
+        return [cfg.voice_primary]  # e.g. "piper": a manual choice, no chain
+    chain = [v for v in ORDER[ORDER.index(cfg.voice_primary):] if v in available]
+    return chain or [LAST_RESORT]
+
+
+def should_fail_over(category) -> bool:
+    """Errors that mean "this voice won't work right now": move to the next one.
+
+    Pipecat only fails over on bad credentials/requests; a used-up free allowance,
+    a dropped connection or a crashed local server should switch voices too.
+    """
+    from pipecat.utils.errors import ErrorCategory as C
+
+    return category in {C.AUTHENTICATION, C.AUTHORIZATION, C.INVALID_REQUEST,
+                        C.QUOTA, C.RATE_LIMIT, C.CONNECTIVITY, C.SERVER}
 
 
 def build_tts(cfg, env: dict[str, str]):
     """One TTS service, or a failover switcher over the chain."""
     from loguru import logger
 
-    services = [_make(name, cfg, env) for name in voice_chain(cfg, env)]
-    logger.info(f"voices: {[type(s).__name__ for s in services]}")
+    names = voice_chain(cfg, available_voices(env))
+    services = [_make(name, cfg, env) for name in names]
+    logger.info(f"voices: {names}")
     if len(services) == 1:
         return services[0]
     from pipecat.pipeline.service_switcher import ServiceSwitcher, ServiceSwitcherStrategyFailover
+
+    for svc in services[:-1]:
+        @svc.event_handler("on_error")
+        async def _maybe_fail_over(service, error):
+            if should_fail_over(error.category) and service.is_usable:
+                logger.warning(f"voice {service.name} unavailable ({error.category}); switching")
+                await service.set_usable(False)
 
     return ServiceSwitcher(services=services, strategy_type=ServiceSwitcherStrategyFailover)
 
@@ -56,6 +91,10 @@ def _make(name: str, cfg, env: dict[str, str]):
             api_key=env["ELEVENLABS_API_KEY"],
             settings=ElevenLabsTTSService.Settings(voice=cfg.elevenlabs_voice_id, model=cfg.elevenlabs_model),
         )
+    if name == "zonos3":
+        from omarum import zonos3_tts
+
+        return zonos3_tts.make_service(f"http://127.0.0.1:{cfg.zonos3_port}", cfg.zonos3_voice, cfg.zonos3_language)
     if name == "kokoro":
         from pipecat.services.kokoro.tts import KokoroTTSService
 
