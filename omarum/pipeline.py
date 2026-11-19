@@ -30,7 +30,7 @@ from omarum.volume import Volume
 from omarum.recorder import Session, TranscriptTap
 from omarum.voices import available_voices, build_tts, load_env_file, voice_chain
 from omarum.turns import mute_strategies, turn_strategies, vad_params
-from omarum.models import pick_whisper, resolve_whisper_model
+from omarum.models import make_stt, resolve_whisper_model
 
 Emit = Callable[[dict], None]
 
@@ -43,16 +43,18 @@ def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, C
     transport = LocalAudioTransport(
         LocalAudioTransportParams(audio_in_enabled=True, audio_out_enabled=True)
     )
-    model, device, compute = pick_whisper(cfg)
-    logger.info(f"whisper: {model} on {device}")
-    stt = WhisperSTTService(
-        settings=WhisperSTTService.Settings(
-            model=resolve_whisper_model(model), no_speech_prob=cfg.whisper_no_speech_prob
-        ),
-        device=device,
-        compute_type=compute,
-        ttfs_p99_latency=cfg.whisper_ttfs_p99,
-    )
+    def whisper(model: str, device: str, compute: str) -> WhisperSTTService:
+        logger.info(f"whisper: {model} on {device}")
+        return WhisperSTTService(
+            settings=WhisperSTTService.Settings(
+                model=resolve_whisper_model(model), no_speech_prob=cfg.whisper_no_speech_prob
+            ),
+            device=device,
+            compute_type=compute,
+            ttfs_p99_latency=cfg.whisper_ttfs_p99,
+        )
+
+    stt = make_stt(cfg, whisper)
     llm = ClaudeCodeLLMService(
         model=cfg.brain_model,
         system_prompt=build_system_prompt(cfg, store, datetime.now()),

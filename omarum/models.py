@@ -25,3 +25,21 @@ def pick_whisper(cfg, cuda_devices: int | None = None) -> tuple[str, str, str]:
     if use_cuda:
         return (cfg.whisper_model, "cuda", "default")
     return (cfg.whisper_cpu_model, "cpu", "int8")
+
+
+def make_stt(cfg, factory, cuda_devices: int | None = None):
+    """Build the speech-to-text service; a GPU too full for Whisper falls back to the CPU model.
+
+    `factory(model, device, compute_type)` builds the service (it loads the model).
+    """
+    model, device, compute = pick_whisper(cfg, cuda_devices)
+    try:
+        return factory(model, device, compute)
+    except RuntimeError as exc:
+        msg = str(exc).lower()
+        if device != "cuda" or not ("out of memory" in msg or "cuda" in msg):
+            raise
+        from loguru import logger
+
+        logger.warning(f"whisper {model} doesn't fit on the GPU ({exc}); using {cfg.whisper_cpu_model} on the CPU")
+        return factory(cfg.whisper_cpu_model, "cpu", "int8")

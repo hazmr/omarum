@@ -228,6 +228,7 @@ class Daemon:
         return self._reply()
 
     async def _run(self, task, session: int) -> None:
+        stop = self._stop
         try:
             await self._run_task(task)
         except Exception as exc:
@@ -240,6 +241,13 @@ class Daemon:
                 self._audio_free_at = time.monotonic() + self.cfg.audio_release_secs
                 if self.state != "error":
                     self._set_state("closed")
+            # Drop this session's pipeline now, so its Whisper model leaves the GPU.
+            if self._stop is stop:
+                self._stop = None
+            del task
+            import gc
+
+            gc.collect()
 
     async def _watch_idle(self) -> None:
         while self._active:

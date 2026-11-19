@@ -453,3 +453,13 @@ def test_cli_summary_prints_one_json_line(monkeypatch, capsys):
     cli.main(["summary"])
     out = capsys.readouterr().out
     assert out.count("\n") == 1 and json.loads(out) == {"name": "Rum", "talks": 0}
+
+
+async def test_finished_session_releases_its_pipeline():
+    """The old pipeline (and its Whisper model on the GPU) must not live on until the next session."""
+    f = FakeFactory()
+    d = make(f)
+    await d.handle({"cmd": "toggle"})
+    assert d._stop is not None
+    await d.handle({"cmd": "toggle"})
+    assert d._stop is None
