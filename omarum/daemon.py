@@ -10,6 +10,9 @@ from typing import Awaitable, Callable
 from loguru import logger
 
 from omarum.config import Config
+from omarum.memory import update_profile, write_journal
+from omarum.recorder import read_transcript
+from omarum.store import Store
 from omarum.orbstate import USER_VOICE_THRESHOLD
 
 ACTIVE = {"listening", "user_speaking", "thinking", "speaking"}
@@ -34,6 +37,8 @@ class Daemon:
         hub,
         pipeline_factory: Callable = _default_factory,
         run_task: Callable[[object], Awaitable[None]] = _pipecat_run,
+        store: Store | None = None,
+        memory_runner: Callable[[Callable[[], None]], None] | None = None,
     ) -> None:
         self.cfg = cfg
         self.hub = hub
@@ -47,7 +52,11 @@ class Daemon:
         self._watchdog: asyncio.Task | None = None
         self._listening_since = time.monotonic()
         self._session = 0  # bumps on every start/end; stale sessions' events are dropped
-        self._recording = None  # the current conversation's Session (closed in phase 2 task 6)
+        self._recording = None  # the current conversation's Session
+        self.store = store or Store()
+        self._memory_runner = memory_runner or self._background
+        self._memory_jobs = 0
+        self._executor = None
         self._audio_free_at = 0.0  # monotonic time when the last session's audio threads are done
 
     # -- events from the pipeline -------------------------------------------
@@ -82,7 +91,7 @@ class Daemon:
         self.hub.broadcast(msg)
 
     def _reply(self, ok: bool = True) -> dict:
-        r = {"ok": ok, "state": self.state}
+        r = {"ok": ok, "state": self.state, "memory": "updating" if self._memory_jobs else "idle"}
         if self.reason:
             r["reason"] = self.reason
         return r
@@ -90,6 +99,45 @@ class Daemon:
     @property
     def _active(self) -> bool:
         return self._runner is not None and not self._runner.done()
+
+    # -- memory (runs in one background thread, never blocks a conversation) ---
+    def _background(self, job: Callable[[], None]) -> None:
+        if self._executor is None:
+            from concurrent.futures import ThreadPoolExecutor
+
+            self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="omarum-memory")
+        self._executor.submit(job)
+
+    def _queue(self, job: Callable[[], None]) -> None:
+        def run() -> None:
+            try:
+                job()
+            except Exception:
+                logger.exception("memory job failed")
+            finally:
+                self._memory_jobs -= 1
+
+        self._memory_jobs += 1
+        self._memory_runner(run)
+
+    def _save_conversation(self) -> None:
+        rec, self._recording = self._recording, None
+        if rec is None:
+            return
+        cfg, store = self.cfg, self.store
+
+        def job() -> None:
+            folder = rec.close(rec.meta)  # audio compression happens here, off the event loop
+            if folder:
+                update_profile(store, read_transcript(folder / "transcript.jsonl"), cfg)
+
+        self._queue(job)
+
+    def on_startup(self, now) -> None:
+        """Catch up on journals for past days, then apply the retention policy."""
+        for day in self.store.days_without_journal(now.date()):
+            self._queue(lambda day=day: write_journal(self.store, day, self.cfg))
+        self._queue(lambda: self.store.prune(self.cfg.retention_days, now))
 
     # -- commands ------------------------------------------------------------
     async def handle(self, cmd: dict) -> dict:
@@ -143,6 +191,7 @@ class Daemon:
         finally:
             if session == self._session:  # ended on its own, not through _end()
                 self._session += 1
+                self._save_conversation()
                 self._audio_free_at = time.monotonic() + self.cfg.audio_release_secs
                 if self.state != "error":
                     self._set_state("closed")
@@ -167,6 +216,7 @@ class Daemon:
         except asyncio.TimeoutError:
             runner.cancel()
         self._audio_free_at = time.monotonic() + self.cfg.audio_release_secs
+        self._save_conversation()
         if self.state != "error":
             self._set_state("closed")
         return self._reply()
@@ -181,6 +231,10 @@ async def run_daemon() -> None:
     cfg = load_config()
     hub = EventHub()
     daemon = Daemon(cfg, hub)
+    daemon.store.ensure()
+    from datetime import datetime
+
+    daemon.on_startup(datetime.now())
     await hub.serve(SOCKET_PATH, daemon.handle)
     logger.info(f"omarum daemon listening on {SOCKET_PATH}")
     # ZONOS3 keeps its model loaded in its own server; start it once with the daemon.

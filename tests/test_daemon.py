@@ -218,3 +218,107 @@ async def test_brain_error_closes_the_session_and_mic():
     assert d.state == "error"      # the orb still shows the error
     r = await d.handle({"cmd": "status"})
     assert "usage limit" in r["reason"]
+
+
+# ---- phase 2: memory -------------------------------------------------------
+
+from datetime import date as _date, datetime as _datetime
+
+from omarum.store import Store
+
+
+class FakeSession:
+    def __init__(self, saved_dir):
+        self.saved_dir, self.meta, self.closed = saved_dir, {"voices": []}, 0
+
+    def close(self, meta):
+        self.closed += 1
+        return self.saved_dir
+
+
+class SessionFactory(FakeFactory):
+    def __init__(self, saved_dir, **kw):
+        super().__init__(**kw)
+        self.session = FakeSession(saved_dir)
+
+    def __call__(self, cfg, emit):
+        task, stop, _ = super().__call__(cfg, emit)
+        return task, stop, self.session
+
+
+def inline(job):
+    job()
+
+
+def make_mem(factory, tmp_path, monkeypatch, fail=False, **cfg):
+    calls = []
+
+    def fake_update(store, transcript, cfg_):
+        calls.append(("profile", transcript))
+        if fail:
+            raise RuntimeError("usage limit")
+        return True
+
+    def fake_journal(store, day, cfg_):
+        calls.append(("journal", day))
+        return True
+
+    monkeypatch.setattr("omarum.daemon.update_profile", fake_update)
+    monkeypatch.setattr("omarum.daemon.write_journal", fake_journal)
+    store = Store(tmp_path)
+    store.ensure()
+    d = Daemon(Config(**cfg), FakeHub(), pipeline_factory=factory, run_task=fake_run,
+               store=store, memory_runner=inline)
+    return d, calls, store
+
+
+def _saved(tmp_path):
+    d = tmp_path / "conv"
+    d.mkdir()
+    (d / "transcript.jsonl").write_text('{"who":"user","text":"I am job hunting"}\n')
+    return d
+
+
+async def test_profile_update_queued_after_session(tmp_path, monkeypatch):
+    f = SessionFactory(_saved(tmp_path))
+    d, calls, _ = make_mem(f, tmp_path, monkeypatch)
+    await d.handle({"cmd": "start"})
+    await d.handle({"cmd": "stop"})
+    assert f.session.closed == 1
+    assert calls == [("profile", [{"who": "user", "text": "I am job hunting"}])]
+
+
+async def test_empty_session_queues_nothing(tmp_path, monkeypatch):
+    f = SessionFactory(None)
+    d, calls, _ = make_mem(f, tmp_path, monkeypatch)
+    await d.handle({"cmd": "start"})
+    await d.handle({"cmd": "stop"})
+    assert f.session.closed == 1 and calls == []
+
+
+async def test_self_ended_session_also_saved(tmp_path, monkeypatch):
+    f = SessionFactory(_saved(tmp_path))
+    d, calls, _ = make_mem(f, tmp_path, monkeypatch)
+    await d.handle({"cmd": "start"})
+    f.finish()
+    await asyncio.sleep(0.1)
+    assert f.session.closed == 1 and [c[0] for c in calls] == ["profile"]
+
+
+async def test_memory_failure_does_not_break_next_session(tmp_path, monkeypatch):
+    f = SessionFactory(_saved(tmp_path))
+    d, calls, _ = make_mem(f, tmp_path, monkeypatch, fail=True)
+    await d.handle({"cmd": "start"})
+    await d.handle({"cmd": "stop"})
+    r = await d.handle({"cmd": "start"})
+    assert r["ok"] and d.state == "listening"
+    assert (await d.handle({"cmd": "status"}))["memory"] == "idle"
+
+
+async def test_journals_for_missing_days_queued_at_start(tmp_path, monkeypatch):
+    f = SessionFactory(None)
+    d, calls, store = make_mem(f, tmp_path, monkeypatch)
+    c = store.new_conversation(_datetime(2026, 11, 17, 9, 0))
+    (c / "transcript.jsonl").write_text('{"who":"user","text":"hi"}\n')
+    d.on_startup(_datetime(2026, 11, 19, 12, 0))
+    assert calls == [("journal", _date(2026, 11, 17))]
