@@ -7,6 +7,8 @@ import tomllib
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 
+from omarum.brains import PROVIDERS
+
 CONFIG_PATH = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "omarum" / "config.toml"
 
 
@@ -18,7 +20,9 @@ def _default_user() -> str:
 class Config:
     companion_name: str = "Rum"
     user_name: str = field(default_factory=_default_user)
-    brain_model: str = "haiku"
+    brain: str = "claude-code"  # any provider in omarum/brains.py: a subscription CLI or an API
+    brain_model: str = "haiku"  # any model name the provider accepts; "" = its default
+    brain_url: str = ""  # only for brain = "custom": an OpenAI-compatible endpoint
     whisper_model: str = "large-v3-turbo"
     whisper_device: str = "auto"  # auto | cuda | cpu
     whisper_cpu_model: str = "base.en"
@@ -52,7 +56,7 @@ class Config:
 
 
 CHOICES: dict[str, tuple] = {
-    "brain_model": ("haiku", "sonnet", "opus"),
+    "brain": tuple(PROVIDERS),
     "voice_primary": ("elevenlabs", "zonos3", "kokoro", "piper"),
     "orb_style": ("glow", "lines", "ring"),
     "orb_position": ("top-right", "top-center", "top-left", "center", "bottom-center"),
