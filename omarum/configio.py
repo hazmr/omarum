@@ -71,3 +71,10 @@ def set_secret(name: str, value: str, path: Path = ENV_PATH) -> None:
 
 def has_secret(name: str, path: Path = ENV_PATH) -> bool:
     return any(l.startswith(f"{name}=") and len(l) > len(name) + 1 for l in _env_lines(path))
+
+
+def get_secret(name: str, path: Path = ENV_PATH) -> str:
+    for line in _env_lines(path):
+        if line.startswith(f"{name}="):
+            return line[len(name) + 1:].strip()
+    return ""

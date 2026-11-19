@@ -31,6 +31,7 @@ class Row:
     kind: str  # cycle | seg | toggle | slider | text | secret | shortcut | info | action | model
     options: tuple = ()
     hint: str = ""
+    labels: tuple = ()  # (value, shown name) pairs, when values are ids
 
 
 ROWS: list[Row] = [
@@ -94,12 +95,33 @@ def brain_rows(brain: str, brain_status=None) -> list[Row]:
     return rows
 
 
-def rows_for(tab: str, brain: str = "claude-code", brain_status=None) -> list[Row]:
+def eleven_voice_row(voices: list, status: str = "") -> Row:
+    """Pick from the voices this ElevenLabs account has (ids underneath, names on screen)."""
+    if not voices:
+        return Row("Engine", "Voice", "ElevenLabs voice", "elevenlabs_voice_id", "cycle", ("",),
+                   hint=status or "paste a key with the 'Voices: Read' permission to see your voices",
+                   labels=(("", "—"),))
+    return Row("Engine", "Voice", "ElevenLabs voice", "elevenlabs_voice_id", "cycle",
+               tuple(v[0] for v in voices), hint=status or "←/→ your ElevenLabs voices",
+               labels=tuple((v[0], v[1]) for v in voices))
+
+
+def rows_for(tab: str, brain: str = "claude-code", brain_status=None, eleven_voices=None,
+             eleven_status: str = "") -> list[Row]:
     rows = [r for r in ROWS if r.tab == tab]
-    return brain_rows(brain, brain_status) + rows if tab == "Engine" else rows
+    if tab != "Engine":
+        return rows
+    out: list[Row] = []
+    for r in rows:
+        out.append(r)
+        if r.key == "ELEVENLABS_API_KEY":
+            out.append(eleven_voice_row(eleven_voices or [], eleven_status))
+    return brain_rows(brain, brain_status) + out
 
 
 def display(r: Row, value) -> str:
+    if r.labels:
+        return dict(r.labels).get(value, "default voice" if value else "—")
     if r.key == "brain":
         p = PROVIDERS.get(value, PROVIDERS["claude-code"])
         return f"{p.label} ({p.group.lower()})"

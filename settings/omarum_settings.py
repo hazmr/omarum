@@ -22,7 +22,8 @@ from gi.repository import Gdk, GLib, Gtk, Pango  # noqa: E402
 
 from omarum import brains, library, settings_model as sm  # noqa: E402
 from omarum.config import load_config  # noqa: E402
-from omarum.configio import has_secret, save_config, set_secret  # noqa: E402
+from omarum import elevenlabs  # noqa: E402
+from omarum.configio import get_secret, has_secret, save_config, set_secret  # noqa: E402
 from omarum.ipc import DaemonNotRunning, send_command  # noqa: E402
 from omarum.models import MODELS_DIR  # noqa: E402
 from omarum.shortcuts import conflicts, current_binds, normalize  # noqa: E402
@@ -78,6 +79,9 @@ class Settings(Gtk.ApplicationWindow):
         self.items: list[Item] = []
         self.editing: Gtk.Entry | None = None
         self.editing_row: sm.Row | None = None
+        self.eleven_voices = elevenlabs.load_cache()
+        self.eleven_status = ""  # "✓ works" or why ElevenLabs can't speak
+        self.eleven_ok = False
         self.armed: str | None = None  # "forget:3" / "delete:<dir>" waiting for a second d
         self.player: subprocess.Popen | None = None
         self.message = ""
@@ -113,13 +117,15 @@ class Settings(Gtk.ApplicationWindow):
         self.add_controller(keys)
         self.connect("close-request", lambda *_: self.stop_playback() or False)
         self.render()
+        self.check_elevenlabs()  # fresh voice list and a plain-words status each time settings opens
 
     # -- data -----------------------------------------------------------------
     def build_items(self) -> list[Item]:
         tab = sm.TABS[self.tab]
         items: list[Item] = []
         group = None
-        for r in sm.rows_for(tab, brain=self.values.get("brain", "claude-code"), brain_status=self.brain_status):
+        for r in sm.rows_for(tab, brain=self.values.get("brain", "claude-code"), brain_status=self.brain_status,
+                             eleven_voices=self.eleven_voices, eleven_status=self.eleven_status):
             if r.group != group:
                 group = r.group
                 items.append(Item("group", group))
@@ -169,7 +175,7 @@ class Settings(Gtk.ApplicationWindow):
             ("ZONOS3 voice", zonos3_installed(), "local voice server"),
             ("Kokoro voice", (MODELS_DIR / "kokoro" / "kokoro-v1.0.onnx").exists(), "always-there fallback"),
             ("Whisper models", bool(whisper), ", ".join(whisper) or "downloaded on first use"),
-            ("ElevenLabs key", has_secret("ELEVENLABS_API_KEY"), "optional cloud voice"),
+            ("ElevenLabs", self.eleven_ok, self.eleven_status or ("checking…" if has_secret("ELEVENLABS_API_KEY") else "optional cloud voice: add a key above")),
         ]
 
     def dataclass_cfg(self):
@@ -357,6 +363,8 @@ class Settings(Gtk.ApplicationWindow):
         new = sm.step(it.row, self.value_of(it.row), direction)
         if new != self.value_of(it.row):
             self.save(it.row.key, new)
+            if it.row.key == "elevenlabs_voice_id":
+                self.check_elevenlabs()
             if it.row.key == "brain":
                 self.save("brain_model", "")  # the old model name belongs to the old brain
         self.render()
@@ -392,11 +400,46 @@ class Settings(Gtk.ApplicationWindow):
         self.render()
         GLib.idle_add(sm.once(entry.grab_focus))
 
+    def check_elevenlabs(self) -> None:
+        """In the background: load this key's voices, keep a voice it can use, test it, say why not."""
+        import threading
+
+        key, voice, model = (get_secret("ELEVENLABS_API_KEY"), self.values.get("elevenlabs_voice_id", ""),
+                             self.values.get("elevenlabs_model", "eleven_flash_v2_5"))
+        if not key:
+            self.eleven_ok, self.eleven_status = False, ""
+            return
+        self.eleven_status = "checking…"
+
+        def work() -> None:
+            voices, pick = self.eleven_voices, voice
+            try:
+                voices = elevenlabs.list_voices(key)
+                elevenlabs.save_cache(voices)
+                if voices and voice not in {v[0] for v in voices}:
+                    pick = voices[0][0]  # a default voice the account can use
+            except elevenlabs.ElevenLabsError as e:
+                why = str(e)  # `e` is gone once the except block ends; the callback runs later
+                GLib.idle_add(sm.once(lambda: self._eleven_done(voices, voice, False, why)))
+                return
+            why = elevenlabs.check(key, pick, model)
+            GLib.idle_add(sm.once(lambda: self._eleven_done(voices, pick, why is None, why or "✓ works")))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _eleven_done(self, voices, voice, ok: bool, status: str) -> None:
+        self.eleven_voices, self.eleven_ok, self.eleven_status = voices, ok, status
+        if voice and voice != self.values.get("elevenlabs_voice_id"):
+            self.save("elevenlabs_voice_id", voice)
+        self.render()
+
     def finish_edit(self, r: sm.Row, text: str) -> None:
         self.editing = None
         if r.kind == "secret":
             set_secret(r.key, text.strip())
             self.flash("Key saved" if text.strip() else "Key removed")
+            if r.key == "ELEVENLABS_API_KEY":
+                self.check_elevenlabs()
         elif text.strip() or r.kind == "model":  # an empty model means "the provider's default"
             self.save(r.key, text.strip())
         self.render()

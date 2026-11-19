@@ -150,3 +150,16 @@ def test_elevenlabs_key_sits_right_under_the_voice_engine():
     key = voice[1]
     assert key.kind == "secret" and key.key == "ELEVENLABS_API_KEY"
     assert "Enter" in key.hint and "paste" in key.hint
+
+
+def test_elevenlabs_voice_row_lists_account_voices_by_name():
+    from omarum.settings_model import display, rows_for, step
+
+    voices = [("p1", "Sarah", "premade"), ("p2", "George", "premade")]
+    rows = [r for r in rows_for("Engine", eleven_voices=voices) if r.group == "Voice"]
+    assert [r.label for r in rows][:3] == ["Engine", "ElevenLabs API key", "ElevenLabs voice"]
+    v = rows[2]
+    assert v.key == "elevenlabs_voice_id" and v.options == ("p1", "p2")
+    assert display(v, "p2") == "George" and step(v, "p1", +1) == "p2"
+    none = [r for r in rows_for("Engine", eleven_voices=[]) if r.label == "ElevenLabs voice"][0]
+    assert "Voices: Read" in none.hint
