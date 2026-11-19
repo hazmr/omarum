@@ -42,7 +42,10 @@ class Config:
     record_audio: bool = True  # keep both voices of every conversation (spec §8)
     retention_days: int = 0  # 0 = keep conversations forever
     audio_release_secs: float = 0.6  # pause between sessions so the audio device is fully closed
-    orb_position: str = "top-right"
+    orb_position: str = "top-right"  # top-right | top-center | top-left | center | bottom-center
+    orb_style: str = "glow"  # glow | lines | ring
+    orb_size: int = 160  # px, 96-320
+    orb_colors: str = "theme"  # theme | warm | glass | mono
 
 
 def load_config(path: Path | None = None) -> Config:

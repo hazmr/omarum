@@ -58,3 +58,14 @@ def test_speaking_colors_are_vivid_idle_is_not():
     assert theme.state_color("user_speaking", p) == theme.vivid(p["user"])
     assert theme.state_color("speaking", p) == theme.vivid(p["companion"])
     assert theme.state_color("listening", p) == p["idle"]
+
+
+def test_palette_presets():
+    assert theme.palette_for("warm")["user"] == theme._hex("#ff8a65")
+    assert theme.palette_for("glass")["companion"] == theme._hex("#e0f2ff")
+
+
+def test_unknown_colors_use_theme(monkeypatch):
+    monkeypatch.setattr(theme, "load_palette", lambda *a, **k: {"sentinel": True})
+    assert theme.palette_for("neon") == {"sentinel": True}
+    assert theme.palette_for("theme") == {"sentinel": True}

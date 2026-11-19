@@ -82,3 +82,20 @@ def state_color(state: str, palette: dict[str, RGB]) -> RGB:
         "speaking": vivid(palette["companion"]),
         "error": vivid(palette["error"]),
     }.get(state, palette["idle"])
+
+
+def _preset(user: str, companion: str) -> dict[str, RGB]:
+    return {"user": _hex(user), "companion": _hex(companion), "idle": _hex("#5a5a5a"),
+            "error": _hex("#e57373"), "background": _hex("#000000")}
+
+
+PRESETS: dict[str, dict[str, RGB]] = {
+    "warm": _preset("#ff8a65", "#ffb74d"),
+    "glass": _preset("#9ad1ff", "#e0f2ff"),
+    "mono": _preset("#e0e0e0", "#ffffff"),
+}
+
+
+def palette_for(colors: str) -> dict[str, RGB]:
+    """'theme' (live Omarchy palette) or a built-in preset; anything unknown follows the theme."""
+    return dict(PRESETS[colors]) if colors in PRESETS else load_palette()
