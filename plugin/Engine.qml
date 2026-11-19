@@ -85,7 +85,8 @@ Item {
   Process {
     id: daemon
     environment: engine.env
-    command: [engine.python, "-m", "omarum.cli", "daemon"]
+    // exec: the shell's child *is* the daemon, so stopping the plugin stops it. Log kept for debugging.
+    command: ["sh", "-c", "mkdir -p \"$HOME/.local/state/omarum\" && exec \"$1\" -m omarum.cli daemon >>\"$HOME/.local/state/omarum/daemon.log\" 2>&1", "omarum-daemon", engine.python]
     onRunningChanged: if (running) { engine.phase = "running"; connectTimer.restart(); engine.refreshInfo() }
     onExited: function(code) {
       engine.state = "off"

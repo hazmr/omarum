@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import subprocess
-from pathlib import Path
 
 MOD_ORDER = ("SUPER", "CTRL", "ALT", "SHIFT")
 MOD_BITS = {"SHIFT": 1, "CTRL": 4, "ALT": 8, "SUPER": 64}
@@ -23,7 +22,6 @@ APP_CONFLICTS = {
     "CTRL + SHIFT + ESCAPE": "Task manager (common)",
 }
 
-HYPR_DIR = Path.home() / ".config" / "hypr"
 
 
 def normalize(combo: str) -> str:
@@ -60,25 +58,3 @@ def current_binds() -> list[dict]:
         return json.loads(subprocess.run(["hyprctl", "binds", "-j"], capture_output=True, text=True, timeout=3).stdout)
     except (OSError, ValueError, subprocess.SubprocessError):
         return []
-
-
-def to_lua(cfg, omarum_bin: str) -> str:
-    lines = ["-- Written by Omarum (change these in `omarum settings`, not here)."]
-    talk = normalize(cfg.talk_shortcut)
-    if talk:
-        lines.append(f'o.bind_hold("{talk}", "Talk to Rum (hold) / hands-free (tap)", "{omarum_bin} ptt_down", '
-                     f'"Talk to Rum: release", "{omarum_bin} ptt_up")')
-    settings = normalize(cfg.settings_shortcut)
-    if settings:
-        lines.append(f'o.bind("{settings}", "Omarum settings", "{omarum_bin} settings")')
-    return "\n".join(lines) + "\n"
-
-
-def apply(cfg, omarum_bin: str, hypr_dir: Path = HYPR_DIR) -> None:
-    """Write ~/.config/hypr/omarum.lua, load it from bindings.lua once, reload Hyprland."""
-    (hypr_dir / "omarum.lua").write_text(to_lua(cfg, omarum_bin))
-    bindings = hypr_dir / "bindings.lua"
-    text = bindings.read_text() if bindings.exists() else ""
-    if "hypr.omarum" not in text:
-        bindings.write_text(text + '\n-- Omarum voice companion\npcall(require, "hypr.omarum")\n')
-    subprocess.run(["hyprctl", "reload"], capture_output=True, timeout=10)

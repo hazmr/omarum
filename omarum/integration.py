@@ -1,16 +1,11 @@
-"""Omarchy integration edits used by scripts/install.sh and scripts/uninstall.sh. Stdlib only.
+"""Edits to Omarchy files the old installer made, and their exact reversal (used by omarum.migrate).
 
-Every edit is idempotent and reversible: Omarum adds whole lines of its own and
-removes exactly those lines, never touching anyone else's.
-
-    python -m omarum.integration menu-add|menu-remove FILE
-    python -m omarum.integration unit TEMPLATE OUT REPO OMARUM_BIN
-    python -m omarum.integration unrequire BINDINGS_LUA
+Omarum added whole lines of its own and removes exactly those lines, never anyone else's.
+Stdlib only.
 """
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 MENU_KEYS = ("omarum", "omarum.talk", "omarum.settings", "omarum.restart")
@@ -53,10 +48,6 @@ def remove_menu_entries(jsonc: str) -> str:
     return "".join(line for line in jsonc.splitlines(keepends=True) if not _is_ours(line))
 
 
-def render_unit(template: str, repo: Path, omarum_bin: str) -> str:
-    return template.replace("@REPO@", str(repo)).replace("@OMARUM@", omarum_bin)
-
-
 def remove_require(bindings_lua: str) -> str:
     """Drop the block shortcuts.apply appended (with the blank line before it), nothing else."""
     lines = bindings_lua.splitlines(keepends=True)
@@ -74,34 +65,3 @@ def remove_require(bindings_lua: str) -> str:
         out.append(lines[i])
         i += 1
     return "".join(out)
-
-
-def _edit(path: Path, fn) -> None:
-    old = path.read_text() if path.exists() else ""
-    new = fn(old)
-    if new != old:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(new)
-
-
-def main(argv: list[str]) -> int:
-    match argv:
-        case ["menu-add", f]:
-            _edit(Path(f), add_menu_entries)
-        case ["menu-remove", f]:
-            if Path(f).exists():
-                _edit(Path(f), remove_menu_entries)
-        case ["unit", tpl, out, repo, omarum_bin]:
-            Path(out).parent.mkdir(parents=True, exist_ok=True)
-            Path(out).write_text(render_unit(Path(tpl).read_text(), Path(repo), omarum_bin))
-        case ["unrequire", f]:
-            if Path(f).exists():
-                _edit(Path(f), remove_require)
-        case _:
-            print(__doc__, file=sys.stderr)
-            return 2
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))

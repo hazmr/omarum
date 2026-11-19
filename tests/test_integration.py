@@ -2,7 +2,7 @@ import json
 import re
 from pathlib import Path
 
-from omarum.integration import add_menu_entries, remove_menu_entries, remove_require, render_unit
+from omarum.integration import add_menu_entries, remove_menu_entries, remove_require
 
 
 def parse_like_omarchy(raw: str) -> dict:
@@ -72,17 +72,6 @@ def test_menu_entries_removed_cleanly():
     assert remove_menu_entries(add_menu_entries(MENU)) == MENU
     assert remove_menu_entries(add_menu_entries(EMPTY)) == EMPTY
     assert remove_menu_entries(MENU) == MENU
-
-
-def test_render_unit():
-    tpl = "ExecStart=@OMARUM@ daemon\nWorkingDirectory=@REPO@\nExecStart=@REPO@/bin/omarum-orb\n"
-    out = render_unit(tpl, Path("/home/u/omarum"), "/home/u/.local/bin/omarum")
-    assert out == (
-        "ExecStart=/home/u/.local/bin/omarum daemon\n"
-        "WorkingDirectory=/home/u/omarum\n"
-        "ExecStart=/home/u/omarum/bin/omarum-orb\n"
-    )
-    assert "@" not in out
 
 
 def test_remove_require_only_ours():

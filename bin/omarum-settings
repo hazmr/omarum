@@ -1,4 +1,0 @@
-#!/bin/sh
-# The settings window runs on the system Python (GTK4 via PyGObject).
-here="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
-exec /usr/bin/python3 "$here/settings/omarum_settings.py" "$@"

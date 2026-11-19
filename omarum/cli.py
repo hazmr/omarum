@@ -11,7 +11,7 @@ from omarum.ipc import SOCKET_PATH, DaemonNotRunning, send_command
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="omarum", description="Talk to Rum.")
-    parser.add_argument("command", choices=["daemon", "toggle", "start", "stop", "status", "reload", "settings", "ptt_down", "ptt_up", "shortcuts", "tap", "watch", "summary"])
+    parser.add_argument("command", choices=["daemon", "toggle", "start", "stop", "status", "reload", "settings", "ptt_down", "ptt_up", "tap", "watch", "summary"])
     parser.add_argument("arg", nargs="?", default="", help="settings: the tab to open (companion, engine, memory, conversations)")
     args = parser.parse_args(argv)
 
@@ -19,8 +19,8 @@ def main(argv: list[str] | None = None) -> None:
         import os
         from pathlib import Path
 
-        launcher = Path(__file__).resolve().parent.parent / "bin" / "omarum-settings"
-        os.execv(str(launcher), [str(launcher)] + ([args.arg] if args.arg else []))
+        script = Path(__file__).resolve().parent.parent / "settings" / "omarum_settings.py"
+        os.execv("/usr/bin/python3", ["/usr/bin/python3", str(script)] + ([args.arg] if args.arg else []))
 
     if args.command == "summary":  # for the bar panel
         import json
@@ -47,20 +47,6 @@ def main(argv: list[str] | None = None) -> None:
             watch(SOCKET_PATH, show)
         except (KeyboardInterrupt, BrokenPipeError):
             pass
-        return
-
-    if args.command == "shortcuts":
-        import shutil
-
-        from omarum.config import load_config
-        from omarum.shortcuts import apply, conflicts, current_binds
-
-        cfg = load_config()
-        apply(cfg, shutil.which("omarum") or sys.argv[0])
-        for name in ("talk_shortcut", "settings_shortcut"):
-            for c in conflicts(getattr(cfg, name), current_binds()):
-                print(f"warning: {getattr(cfg, name)} is also used by: {c}", file=sys.stderr)
-        print(f"talk: {cfg.talk_shortcut or 'none'} (hold = talk, tap = hands-free)")
         return
 
     if args.command == "daemon":

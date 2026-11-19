@@ -16,22 +16,25 @@ A voice companion for [Omarchy](https://omarchy.org). Press a shortcut, a small 
   1. **ElevenLabs** (cloud, needs `ELEVENLABS_API_KEY` in `~/.config/omarum/env`)
   2. **ZONOS3-Mini** (local, Apache 2.0, runs on CPU or any Vulkan GPU)
   3. **Kokoro** (local, always available)
-- Noise doesn't interrupt Rum, the mic is muted while Rum speaks (until echo cancellation lands), and the service restarts itself after a crash.
+- Noise doesn't interrupt Rum, the mic is muted while Rum speaks (until echo cancellation lands), and Rum restarts itself after a crash.
 
 ## Install
 
-Requirements: Omarchy (Hyprland, PipeWire), [uv](https://docs.astral.sh/uv/), the `claude` CLI logged in, and the system packages `gtk4-layer-shell`, `python-gobject` and `portaudio`.
+Omarum is one Omarchy plugin: the bar button and panel, the orb, the talk shortcut and Rum's voice engine.
 
 ```bash
-git clone https://github.com/hazmr/omarum.git && cd omarum
-scripts/install.sh                # add --with-zonos3 to build the ZONOS3-Mini voice too
+omarchy plugin add https://github.com/hazmr/omarum
 ```
 
-The installer is safe to run again. It puts `omarum` on your PATH, downloads the models it needs, binds Ctrl+Shift+Space, and starts two user services at login (`omarum` and `omarum-orb`, restarted after a crash). It also adds an app-launcher entry, an **Omarum** submenu in the Omarchy menu, and Rum's orb in the bar (click: a panel with hands-free, the engine, your last conversation and settings; right-click: hands-free on/off; middle-click: settings).
+Requirements: Omarchy, [uv](https://docs.astral.sh/uv/) (`omarchy pkg add uv`), and a brain you're logged into or have a key for (the `claude` CLI is the default). The first load sets up Rum's Python environment in `~/.local/share/omarum/venv` and downloads the models it needs (Whisper base.en, Kokoro); the panel shows the progress. After that Rum starts with the Omarchy shell and restarts itself after a crash.
 
-`scripts/uninstall.sh` removes exactly what the installer added. Your conversations, memory, models and settings stay unless you pass `--purge`.
+- **Talk:** hold Ctrl+Shift+Space to talk, tap it for hands-free (change it in settings). The plugin binds the key itself while it's loaded.
+- **Bar:** click the orb for the panel (hands-free, the brain, your last conversation, settings); right-click toggles hands-free; middle-click opens settings.
+- **Remove:** `omarchy plugin remove omarum.panel` stops Rum, the orb and the shortcut. Your conversations, memory and settings stay in `~/.local/share/omarum` and `~/.config/omarum`; delete those folders to remove them too.
 
-Models download into `~/.local/share/omarum/` (Whisper, Kokoro). ZONOS3-Mini is optional and built from [Zyphra/ZONOS3-Mini](https://github.com/Zyphra/ZONOS3-Mini) into `~/.local/share/omarum/engines/zonos3`. Logs: `journalctl --user -u omarum -u omarum-orb`.
+Upgrading from the old installer: the first load stops and removes the old systemd services, shortcut file, menu entries, theme hook and `omarum` command for you.
+
+ZONOS3-Mini (an optional local voice) is built by hand from [Zyphra/ZONOS3-Mini](https://github.com/Zyphra/ZONOS3-Mini) into `~/.local/share/omarum/engines/zonos3` (see its README: `cmake -B build-vulkan -DGGML_VULKAN=ON && cmake --build build-vulkan`, then `hf download Zyphra/ZONOS3-Mini` for the `gguf/` files); Rum uses it when it's there.
 
 Settings live in `~/.config/omarum/config.toml`, for example:
 
@@ -42,15 +45,17 @@ zonos3_voice = "Savannah"
 kokoro_voice = "af_heart"
 ```
 
-Useful commands: `omarum status`, `omarum toggle`. Logs are in `~/.local/state/omarum/`.
+Logs: `~/.local/state/omarum/daemon.log`.
 
 ## Development
 
 ```bash
 uv run pytest
+ln -s "$PWD" ~/.config/omarchy/plugins/omarum.panel   # run your checkout as the plugin
+omarchy-shell shell rescanPlugins && omarchy plugin enable omarum.panel
 ```
 
-The daemon (`omarum/`, Python 3.12, [Pipecat](https://github.com/pipecat-ai/pipecat)) and the orb (`orb/`, system Python with GTK4) talk over a Unix socket (`omarum/ipc.py`).
+The plugin (`plugin/`, QML) runs the daemon (`omarum/`, Python 3.12, [Pipecat](https://github.com/pipecat-ai/pipecat)) as a child process and talks to it over a Unix socket (`omarum/ipc.py`). The settings window (`settings/`) is system Python with GTK4.
 
 ## Roadmap
 
@@ -58,4 +63,5 @@ The daemon (`omarum/`, Python 3.12, [Pipecat](https://github.com/pipecat-ai/pipe
 2. ✅ Memory: Rum remembers you day to day; conversations are recorded locally
 3. ✅ The full orb: three styles, positions, palettes, live theme
 4. ✅ A keyboard-first settings app in Omarchy's style
-5. Packaging: systemd user service, Omarchy menu entry, AUR
+5. ✅ Any brain: any subscription CLI or any API
+6. ✅ One plugin: install and remove with `omarchy plugin add` / `remove`
