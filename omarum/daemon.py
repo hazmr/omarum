@@ -135,9 +135,22 @@ class Daemon:
         cfg, store = self.cfg, self.store
 
         def job() -> None:
+            nonlocal cfg
             folder = rec.close(rec.meta)  # audio compression happens here, off the event loop
-            if folder:
-                update_profile(store, read_transcript(folder / "transcript.jsonl"), cfg)
+            if not folder:
+                return
+            rows = read_transcript(folder / "transcript.jsonl")
+            if getattr(rec, "first_meeting", False):  # the names chosen in the first talk become the settings
+                from omarum import firstmeet
+                from omarum.config import load_config
+                from omarum.configio import save_config
+
+                updates = firstmeet.name_updates(rows, cfg)
+                if updates:
+                    save_config(updates)
+                    self.cfg = cfg = load_config()
+                    logger.info(f"first meeting: saved {updates}")
+            update_profile(store, rows, cfg)
 
         self._queue(job)
 

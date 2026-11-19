@@ -38,8 +38,12 @@ Emit = Callable[[dict], None]
 def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, Callable[[], Awaitable[None]], Session]:
     store = store or Store()
     store.ensure()
+    from omarum import firstmeet
+
+    first_meeting = firstmeet.is_first_meeting(store)  # before this session's folder exists
     clock = LatencyClock()
     session = Session(store, cfg, datetime.now())
+    session.first_meeting = first_meeting
     transport = LocalAudioTransport(
         LocalAudioTransportParams(audio_in_enabled=True, audio_out_enabled=True)
     )
@@ -102,6 +106,15 @@ def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, C
         aggregators.assistant(),
     ])
     task = PipelineTask(pipeline, params=PipelineParams(enable_metrics=False))
+
+    if first_meeting:
+        from pipecat.frames.frames import LLMRunFrame
+
+        @task.event_handler("on_pipeline_started")
+        async def _speak_first(_task, _frame):
+            # The first meeting: Rum says hello before the user says anything.
+            context.add_message({"role": "user", "content": firstmeet.OPENER})
+            await task.queue_frames([LLMRunFrame()])
 
     @task.event_handler("on_pipeline_error")
     async def _show_error(_task, frame):

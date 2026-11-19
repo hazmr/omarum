@@ -55,5 +55,9 @@ def build_system_prompt(cfg: Config, store, now: datetime) -> str:
     today = _earlier_today(cfg, store, now.date())
     if today:
         sections.append(f"## Earlier today\n{today}")
+    from omarum import firstmeet
+
+    if firstmeet.is_first_meeting(store):
+        sections.append(firstmeet.prompt_section(cfg).strip())
     sections.append(f"## Right now\nIt is {now.strftime('%A')}, {now.day} {now.strftime('%B %Y, %H:%M')}.")
     return "\n\n".join(sections) + "\n"
