@@ -58,6 +58,8 @@ def summary(cfg, talks, today: date, has_gpu: bool, palette: dict[str, RGB]) -> 
         "voice": voice_label(cfg),
         "shortcut": shortcut_label(cfg.talk_shortcut),
         "talks": len(talks),
+        "talk_keys": cfg.talk_shortcut,  # what the plugin binds (Hyprland syntax)
+        "orb": {"style": cfg.orb_style, "position": cfg.orb_position, "size": cfg.orb_size},
         "last": None if last is None else {
             "text": last.first_line, "when": _when(last.day, last.time, today), "length": duration(last.seconds)},
         # The orb's own colors (theme.state_color), so the bar icon matches the orb on screen.

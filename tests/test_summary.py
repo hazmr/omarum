@@ -57,3 +57,10 @@ def test_summary_yesterday_older_and_none():
     assert s["last"]["when"] == "Nov 2 09:30"
     s = summary(Config(), [], today, False, PALETTE)
     assert s["last"] is None and s["talks"] == 0
+
+
+def test_summary_carries_what_the_plugin_draws_and_binds():
+    s = summary(Config(orb_style="ring", orb_position="center", orb_size=200, talk_shortcut="CTRL + SHIFT + SPACE"),
+                [], date(2026, 11, 19), False, PALETTE)
+    assert s["orb"] == {"style": "ring", "position": "center", "size": 200}
+    assert s["talk_keys"] == "CTRL + SHIFT + SPACE"
