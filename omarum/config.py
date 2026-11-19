@@ -48,11 +48,51 @@ class Config:
     orb_colors: str = "theme"  # theme | warm | glass | mono
 
 
+CHOICES: dict[str, tuple] = {
+    "brain_model": ("haiku", "sonnet", "opus"),
+    "voice_primary": ("elevenlabs", "zonos3", "kokoro", "piper"),
+    "orb_style": ("glow", "lines", "ring"),
+    "orb_position": ("top-right", "top-center", "top-left", "center", "bottom-center"),
+    "orb_colors": ("theme", "warm", "glass", "mono"),
+    "whisper_device": ("auto", "cuda", "cpu"),
+}
+
+
+def _accept(name: str, value, default):
+    """The value if it has the default's type (int ok for float) and an allowed choice, else None."""
+    if isinstance(default, bool):
+        ok = isinstance(value, bool)
+    elif isinstance(default, float):
+        ok = isinstance(value, (int, float)) and not isinstance(value, bool)
+        value = float(value) if ok else value
+    elif isinstance(default, int):
+        ok = isinstance(value, int) and not isinstance(value, bool)
+    else:
+        ok = isinstance(value, str)
+    if ok and name in CHOICES and value not in CHOICES[name]:
+        ok = False
+    return value if ok else None
+
+
 def load_config(path: Path | None = None) -> Config:
+    """Never raises on bad content: a wrong value falls back to its default (and is logged)."""
+    import sys
+
     path = path or CONFIG_PATH
     try:
         data = tomllib.loads(path.read_text())
     except FileNotFoundError:
         data = {}
-    known = {f.name for f in fields(Config)}
-    return Config(**{k: v for k, v in data.items() if k in known})
+    except (tomllib.TOMLDecodeError, OSError, UnicodeDecodeError) as exc:
+        print(f"omarum: {path}: {exc}; using defaults", file=sys.stderr)
+        data = {}
+    defaults = Config()
+    values = {}
+    for f in fields(Config):
+        if f.name in data:
+            v = _accept(f.name, data[f.name], getattr(defaults, f.name))
+            if v is None:
+                print(f"omarum: ignoring {f.name} = {data[f.name]!r} in {path}", file=sys.stderr)
+            else:
+                values[f.name] = v
+    return Config(**values)
