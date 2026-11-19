@@ -233,3 +233,14 @@ def _cli_error(pid, stderr, code):
     from omarum.cli_llm import error_reason
 
     return error_reason(pid, stderr, code)
+
+
+def error_reason(label: str, error: str) -> str:
+    """A brain error from the voice loop, in words the panel can show."""
+    msg = error.split("exception:", 1)[-1].strip()
+    low = msg.lower()
+    if "401" in low or "invalid api key" in low or "api key not valid" in low or "unauthorized" in low:
+        return f"{label} rejected the API key (check it in Omarum settings)"
+    if "connection" in low or "connect" in low or "unreachable" in low:
+        return f"{label} can't be reached: {msg[:120]}"
+    return f"{label} failed: {msg[:160]}"

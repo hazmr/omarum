@@ -112,6 +112,8 @@ async def run_streaming(cmd: list[str], stdin: str | None, cwd: Path, provider_i
 
 
 class CliLLMService(LLMService):
+    reports_own_errors = True  # through on_error, with a better reason
+
     def __init__(self, *, provider_id: str, model: str, system_prompt: str, user: str, companion: str,
                  on_error=None, **kwargs) -> None:
         settings = LLMSettings(

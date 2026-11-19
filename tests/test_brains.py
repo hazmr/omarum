@@ -189,3 +189,12 @@ def test_complete_errors_are_brain_unavailable():
         brains.complete(Config(brain="ollama"), {}, "S", "P", urlopen=urlopen)
     with pytest.raises(brains.BrainUnavailable, match="needs an API key"):
         brains.complete(Config(brain="openai"), {}, "S", "P", urlopen=urlopen)
+
+
+def test_api_error_reasons_are_readable():
+    r = brains.error_reason("Groq", "OpenAILLMService#0 exception: Error code: 401 - {'error': {'message': 'Invalid API Key'}}")
+    assert r == "Groq rejected the API key (check it in Omarum settings)"
+    r = brains.error_reason("Ollama", "OpenAILLMService#0 exception: Connection error.")
+    assert r == "Ollama can't be reached: Connection error."
+    r = brains.error_reason("Gemini", "GoogleLLMService#0 exception: 404 model not found")
+    assert r.startswith("Gemini failed: ") and "404 model not found" in r

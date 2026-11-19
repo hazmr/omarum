@@ -103,6 +103,14 @@ def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, C
     ])
     task = PipelineTask(pipeline, params=PipelineParams(enable_metrics=False))
 
+    @task.event_handler("on_pipeline_error")
+    async def _show_error(_task, frame):
+        # The brain and the ears: say why on the panel. Voice errors stay quiet (they fail over).
+        if frame.processor is llm and not getattr(llm, "reports_own_errors", False):
+            emit({"type": "state", "state": "error", "reason": brains.error_reason(brains.label(cfg).split(" · ")[0], str(frame.error))})
+        elif frame.processor is stt:
+            emit({"type": "state", "state": "error", "reason": f"Speech recognition failed: {str(frame.error).split('failed:', 1)[-1].strip()[:140]}"})
+
     async def stop() -> None:
         # Cancel, don't EndFrame: an EndFrame waits for queued speech to finish playing.
         await task.cancel(reason="closed by user")

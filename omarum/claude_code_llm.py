@@ -80,6 +80,8 @@ def last_user_text(messages: list) -> str:
 
 
 class ClaudeCodeLLMService(LLMService):
+    reports_own_errors = True  # through on_error, with a better reason
+
     def __init__(self, *, model: str, system_prompt: str, on_error=None, **kwargs) -> None:
         # Claude Code owns sampling; declare every setting so pipecat doesn't complain.
         settings = LLMSettings(

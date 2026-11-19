@@ -85,7 +85,9 @@ def current() -> dict:
     if shutil.which("nvidia-smi"):
         try:
             out = subprocess.run(["nvidia-smi", "-L"], capture_output=True, text=True, timeout=3).stdout
-            has_gpu = "GPU" in out
+            from omarum.models import cuda_libs_loadable
+
+            has_gpu = "GPU" in out and cuda_libs_loadable()
         except (OSError, subprocess.SubprocessError):
             pass
     try:
