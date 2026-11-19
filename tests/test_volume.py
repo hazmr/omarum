@@ -52,18 +52,19 @@ def test_leveler_brings_a_quiet_voice_to_speaking_level():
     lev = Leveler(volume=1.0)
     out = [lev.process(f) for f in _speech(-31)]  # what ZONOS3 "Willow" measured
     level, peak = _dbfs(out[25:])  # after the first half second
-    assert -16 <= level <= -12  # like videos and music (about -14), not quieter
+    assert -18 <= level <= -14  # loud for laptop speakers, with room left for peaks
     assert peak < 32767  # no clipping
 
 
 def test_leveler_never_clips_and_respects_the_volume_slider():
     from omarum.volume import Leveler
 
-    loud = _speech(-6)
-    out = [Leveler(volume=3.0).process(f) for f in loud]
-    assert _dbfs(out)[1] <= 32000
-    quiet_half = [Leveler(volume=0.5).process(f) for f in _speech(-31)]
-    assert _dbfs(quiet_half[25:])[0] < _dbfs([Leveler(volume=1.0).process(f) for f in _speech(-31)][25:])[0] - 4
+    def run(frames, volume):  # one leveler follows one voice, frame after frame
+        lev = Leveler(volume=volume)
+        return [lev.process(f) for f in frames]
+
+    assert _dbfs(run(_speech(-6), 3.0))[1] <= 32000
+    assert _dbfs(run(_speech(-31), 0.5)[25:])[0] < _dbfs(run(_speech(-31), 1.0)[25:])[0] - 4
 
 
 def test_leveler_leaves_silence_alone():
@@ -72,3 +73,40 @@ def test_leveler_leaves_silence_alone():
     lev = Leveler(volume=1.0)
     hiss = struct.pack("<480h", *([30, -30] * 240))  # about -60 dBFS
     assert lev.process(hiss) == hiss
+
+
+def _peaky(seconds: float = 2.0, rate: int = 16000) -> list[bytes]:
+    """Loud, peaky speech like ElevenLabs Jessica: about -20 dB average with -2 dB peaks."""
+    import math
+
+    n = int(seconds * rate)
+    s = []
+    for i in range(n):
+        t = i / rate
+        burst = 1.0 if (t * 6) % 1 < 0.08 else 0.25          # a loud syllable start, six times a second
+        s.append(int(26000 * burst * math.sin(2 * math.pi * 180 * t) * (0.5 + 0.5 * abs(math.sin(t * 9)))))
+    frame = rate // 50
+    return [struct.pack(f"<{len(s[i:i + frame])}h", *s[i:i + frame]) for i in range(0, n, frame)]
+
+
+def test_leveler_never_hits_the_ceiling_on_a_loud_peaky_voice():
+    from omarum.volume import Leveler
+
+    for volume in (1.0, 1.5, 3.0):
+        lev = Leveler(volume=volume)
+        out = [lev.process(f) for f in _peaky()]
+        samples = [x for f in out for x in struct.unpack(f"<{len(f) // 2}h", f)]
+        assert sum(1 for x in samples if abs(x) >= 32000) == 0, volume  # no crackle
+
+
+def test_leveler_changes_volume_smoothly():
+    from omarum.volume import Leveler
+
+    lev = Leveler(volume=1.0)
+    frames = _peaky()
+    gains = []
+    for f in frames:
+        lev.process(f)
+        gains.append(lev.gain)
+    # From one 20 ms slice to the next, the volume rises gently (at most +15 %).
+    assert all(b <= a * 1.15 + 1e-9 for a, b in zip(gains, gains[1:]))
