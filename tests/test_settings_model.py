@@ -60,3 +60,8 @@ def test_shortcut_rows_and_display():
     assert display(r, "CTRL + SHIFT + SPACE") == "Ctrl + Shift + Space"
     assert display(row("settings_shortcut"), "") == "none"
     assert step(r, "CTRL + SHIFT + SPACE", +1) == "CTRL + SHIFT + SPACE"  # changed only by recording
+
+
+def test_voice_volume_row():
+    r = row("voice_volume")
+    assert display(r, 150) == "150%" and step(r, 300, +1) == 300 and step(r, 150, +1) == 160

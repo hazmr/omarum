@@ -50,6 +50,7 @@ ROWS: list[Row] = [
         ("Savannah", "Willow", "Imogen", "Wyatt", "Rupert", "Cillian", "Jett")),
     Row("Engine", "Voice", "Kokoro voice", "kokoro_voice", "cycle",
         ("af_heart", "af_bella", "af_nicole", "bf_emma", "am_michael", "bm_george")),
+    Row("Engine", "Voice", "Voice volume", "voice_volume", "slider", (50, 300, 10, "%")),
     Row("Engine", "Voice", "ElevenLabs key", "ELEVENLABS_API_KEY", "secret", hint="Enter to set, empty to remove"),
     Row("Engine", "Ears", "Whisper device", "whisper_device", "seg", ("auto", "cuda", "cpu")),
     # Memory

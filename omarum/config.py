@@ -30,6 +30,7 @@ class Config:
     zonos3_language: str = "en_us"
     kokoro_voice: str = "af_heart"
     piper_voice: str = "en_US-amy-medium"
+    voice_volume: int = 150  # percent; Rum's voice is raised before the speakers (clipped, never distorted by wrap)
     vad_stop_secs: float = 0.3  # smart-turn model decides if the sentence is finished
     vad_confidence: float = 0.8
     vad_start_secs: float = 0.3
