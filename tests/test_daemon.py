@@ -480,3 +480,22 @@ async def test_brain_without_key_errors_with_reason(monkeypatch):
     d = make(f, brain="gemini")
     r = await d.handle({"cmd": "toggle"})
     assert r["ok"] is False and "GEMINI_API_KEY" in r["reason"] and f.starts == 0
+
+
+async def test_quick_tap_over_one_connection_is_a_tap_even_while_starting():
+    """The plugin sends press and release on one socket, handled in order; a slow start
+    must not make the release look late (a tap turning into a hold)."""
+    f = FakeFactory(build_delay=0.6)
+    d = make(f)
+
+    async def tap():  # how the socket server delivers them: each command its own task, in order
+        down = asyncio.create_task(d.handle({"cmd": "ptt_down"}))
+        await asyncio.sleep(0)
+        await d.handle({"cmd": "ptt_up"})  # sent ~instantly after the press
+        await down
+
+    await tap()
+    assert d._ptt.mode == "hands_free"
+    assert d.state == "listening" and f.starts == 1
+    await tap()  # second tap closes
+    assert d.state == "closed"

@@ -18,10 +18,16 @@ Scope {
   property string bound: ""
 
   function eval_(lua) { Quickshell.execDetached(["hyprctl", "eval", lua]) }
+  // Like Omarchy's o.bind_hold: a press bind, and a release bind that ignores modifiers
+  // (letting go of Ctrl first must still count) and only fires after its own press.
   function bind() {
     if (bound && bound !== keys) unbind()
     if (!keys) return
-    eval_('hl.bind("' + keys + '", hl.dsp.global("omarum:talk"), { description = "Talk to Rum (hold) / hands-free (tap)" })')
+    eval_('local held = false\n'
+      + 'hl.bind("' + keys + '", function() held = true; hl.dispatch(hl.dsp.global("omarum:talk-down")) end, '
+      + '{ description = "Talk to Rum (hold) / hands-free (tap)" })\n'
+      + 'hl.bind("' + keys + '", function() if held then held = false; hl.dispatch(hl.dsp.global("omarum:talk-up")) end end, '
+      + '{ description = "Talk to Rum: release", release = true, transparent = true, ignore_mods = true, non_consuming = true })')
     bound = keys
   }
   function unbind() {
@@ -35,10 +41,15 @@ Scope {
 
   GlobalShortcut {
     appid: "omarum"
-    name: "talk"
-    description: "Talk to Rum (hold) / hands-free (tap)"
+    name: "talk-down"
+    description: "Talk to Rum: key pressed"
     onPressed: shortcut.engine.send("ptt_down")
-    onReleased: shortcut.engine.send("ptt_up")
+  }
+  GlobalShortcut {
+    appid: "omarum"
+    name: "talk-up"
+    description: "Talk to Rum: key released"
+    onPressed: shortcut.engine.send("ptt_up")
   }
 
   // A config reload drops runtime binds: put ours back.

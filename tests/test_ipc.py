@@ -75,3 +75,28 @@ async def test_watch_reports_off_then_reconnects(tmp_path: Path):
     await asyncio.wait_for(task, 3)
     assert seen[-1]["state"] == "idle"
     await hub.close()
+
+
+async def test_commands_on_one_connection_dont_wait_for_each_other(tmp_path: Path):
+    """The plugin keeps one socket: a key release must be handled while the press is still
+    starting Rum (otherwise a tap is timed as a hold)."""
+    sock = tmp_path / "s.sock"
+    events = []
+
+    async def on_command(cmd):
+        events.append(("start", cmd["cmd"]))
+        if cmd["cmd"] == "ptt_down":
+            await asyncio.sleep(0.5)  # loading Whisper and the voice
+        events.append(("done", cmd["cmd"]))
+        return {"ok": True, "state": "idle"}
+
+    hub = await _start_hub(sock, on_command)
+    r, w = await asyncio.open_unix_connection(str(sock))
+    w.write(encode({"cmd": "ptt_down"}) + encode({"cmd": "ptt_up"}))
+    await w.drain()
+    for _ in range(2):
+        await asyncio.wait_for(r.readline(), 2)
+    assert events.index(("done", "ptt_up")) < events.index(("done", "ptt_down"))
+    assert events[0] == ("start", "ptt_down")  # still handled in the order sent
+    w.close()
+    await hub.close()

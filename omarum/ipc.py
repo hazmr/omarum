@@ -51,19 +51,30 @@ class EventHub:
         path.unlink(missing_ok=True)
         self._path = path
 
+        async def run_one(line: bytes, writer: asyncio.StreamWriter) -> None:
+            try:
+                reply = await on_command(decode(line))
+            except ValueError as exc:
+                reply = {"ok": False, "state": "error", "reason": str(exc)}
+            if not writer.is_closing():
+                writer.write(encode(reply))
+
         async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+            # Each command runs as its own task, started in arrival order: a key release sent
+            # right after a press is handled while the press is still starting Rum.
             self._clients.add(writer)
+            tasks: set[asyncio.Task] = set()
             try:
                 while line := await reader.readline():
-                    try:
-                        reply = await on_command(decode(line))
-                    except ValueError as exc:
-                        reply = {"ok": False, "state": "error", "reason": str(exc)}
-                    writer.write(encode(reply))
-                    await writer.drain()
+                    t = asyncio.create_task(run_one(line, writer))
+                    tasks.add(t)
+                    t.add_done_callback(tasks.discard)
+                    await asyncio.sleep(0)  # let it reach its first await before reading on
             except (ConnectionError, asyncio.IncompleteReadError):
                 pass
             finally:
+                if tasks:
+                    await asyncio.gather(*tasks, return_exceptions=True)
                 self._clients.discard(writer)
                 writer.close()
 
