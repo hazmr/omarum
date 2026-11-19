@@ -21,7 +21,7 @@ class PushToTalk:
         self._down_at, self._was_mode = now, self.mode
         if self.mode == "closed":
             self.mode = "hold"
-            return ["start", "mic_open"]
+            return ["mic_open", "start"]  # mic state first: a release during a slow start wins
         actions = ["interrupt"] if speaking else []
         if self.mode == "hold":
             actions.append("mic_open")

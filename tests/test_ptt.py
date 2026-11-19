@@ -3,7 +3,7 @@ from omarum.ptt import TAP_SECS, PushToTalk
 
 def test_hold_when_closed_starts_session_with_mic_open_then_closes_mic():
     p = PushToTalk()
-    assert p.press(0.0, open_=False, speaking=False) == ["start", "mic_open"]
+    assert p.press(0.0, open_=False, speaking=False) == ["mic_open", "start"]
     assert p.release(1.5) == ["mic_close"]
     assert p.mode == "hold"
 
@@ -54,7 +54,7 @@ def test_session_closed_elsewhere_resets():
     p.press(0.0, open_=False, speaking=False)
     p.release(0.1)
     p.closed()  # idle timeout or the old toggle command
-    assert p.press(9.0, open_=False, speaking=False) == ["start", "mic_open"]
+    assert p.press(9.0, open_=False, speaking=False) == ["mic_open", "start"]
 
 
 def test_release_without_press_does_nothing():

@@ -14,6 +14,7 @@ from omarum.memory import update_profile, write_journal
 from omarum.recorder import read_transcript
 from omarum.store import Store
 from omarum.orbstate import USER_VOICE_THRESHOLD
+from omarum.ptt import PushToTalk
 
 ACTIVE = {"listening", "user_speaking", "thinking", "speaking"}
 
@@ -57,6 +58,8 @@ class Daemon:
         self._memory_runner = memory_runner or self._background
         self._memory_jobs = 0
         self._executor = None
+        self._ptt = PushToTalk()
+        self._mic_open = True  # applied to the session's mic gate as soon as it exists
         self._audio_free_at = 0.0  # monotonic time when the last session's audio threads are done
 
     # -- events from the pipeline -------------------------------------------
@@ -121,6 +124,8 @@ class Daemon:
         self._memory_runner(run)
 
     def _save_conversation(self) -> None:
+        self._ptt.closed()
+        self._mic_open = True
         rec, self._recording = self._recording, None
         if rec is None:
             return
@@ -144,6 +149,11 @@ class Daemon:
         match cmd.get("cmd"):
             case "status":
                 return self._reply()
+            case "ptt_down":
+                return await self._ptt_act(self._ptt.press(
+                    time.monotonic(), open_=self._active or self._starting, speaking=self.state == "speaking"))
+            case "ptt_up":
+                return await self._ptt_act(self._ptt.release(time.monotonic()))
             case "reload":
                 from omarum.config import load_config
 
@@ -160,6 +170,28 @@ class Daemon:
                 return await (self._end() if self._active else self._start())
             case other:
                 return {"ok": False, "state": self.state, "reason": f"unknown command {other!r}"}
+
+    def _set_mic(self, open_: bool) -> None:
+        self._mic_open = open_
+        gate = getattr(self._recording, "gate", None)
+        if gate is not None:
+            gate.set_open(open_)
+
+    async def _ptt_act(self, actions: list[str]) -> dict:
+        for action in actions:
+            if action == "start":
+                await self._start()
+            elif action == "stop":
+                await self._end()
+            elif action == "interrupt":
+                gate = getattr(self._recording, "gate", None)
+                if gate is not None:
+                    await gate.interrupt()
+            elif action in ("mic_open", "hands_free"):
+                self._set_mic(True)
+            elif action == "mic_close":
+                self._set_mic(False)
+        return self._reply()
 
     async def _start(self) -> dict:
         if self._starting or self._active:
@@ -183,6 +215,7 @@ class Daemon:
             return self._reply(ok=False)
         finally:
             self._starting = False
+        self._set_mic(self._mic_open)  # a release that came while starting still counts
         self._runner = asyncio.create_task(self._run(task, self._session))
         self._watchdog = asyncio.create_task(self._watch_idle())
         self._set_state("listening")

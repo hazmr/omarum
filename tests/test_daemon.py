@@ -351,3 +351,78 @@ async def test_reload_rereads_config(tmp_path, monkeypatch):
     assert d.cfg.brain_model == "haiku"
     await d.handle({"cmd": "reload"})
     assert d.cfg.brain_model == "sonnet"
+
+
+# ---- push-to-talk ------------------------------------------------------------
+
+class FakeGate:
+    def __init__(self):
+        self.is_open, self.interrupts = True, 0
+
+    def set_open(self, v):
+        self.is_open = v
+
+    async def interrupt(self):
+        self.interrupts += 1
+
+
+class GateFactory(FakeFactory):
+    def __call__(self, cfg, emit):
+        task, stop, _ = super().__call__(cfg, emit)
+        self.session = FakeSession(None)
+        self.session.gate = self.gate = FakeGate()
+        return task, stop, self.session
+
+
+async def test_ptt_hold_starts_session_and_release_closes_mic(monkeypatch):
+    clock = [0.0]
+    monkeypatch.setattr("omarum.daemon.time.monotonic", lambda: clock[0])
+    f = GateFactory()
+    d = make(f)
+    await d.handle({"cmd": "ptt_down"})
+    assert f.starts == 1 and f.gate.is_open
+    clock[0] = 2.0
+    await d.handle({"cmd": "ptt_up"})
+    assert not f.gate.is_open and d.state == "listening"
+
+
+async def test_ptt_tap_hands_free_then_tap_closes(monkeypatch):
+    clock = [0.0]
+    monkeypatch.setattr("omarum.daemon.time.monotonic", lambda: clock[0])
+    f = GateFactory()
+    d = make(f)
+    await d.handle({"cmd": "ptt_down"})
+    clock[0] = 0.1
+    await d.handle({"cmd": "ptt_up"})
+    assert f.gate.is_open  # hands-free: mic stays open
+    clock[0] = 5.0
+    await d.handle({"cmd": "ptt_down"})
+    clock[0] = 5.1
+    await d.handle({"cmd": "ptt_up"})
+    assert d.state == "closed" and f.stops == 1
+
+
+async def test_ptt_hold_interrupts_rum(monkeypatch):
+    clock = [0.0]
+    monkeypatch.setattr("omarum.daemon.time.monotonic", lambda: clock[0])
+    f = GateFactory()
+    d = make(f)
+    await d.handle({"cmd": "ptt_down"})
+    clock[0] = 2.0
+    await d.handle({"cmd": "ptt_up"})
+    f.emit({"type": "state", "state": "speaking"})
+    clock[0] = 5.0
+    await d.handle({"cmd": "ptt_down"})
+    assert f.gate.interrupts == 1 and f.gate.is_open
+
+
+async def test_ptt_release_during_slow_start_applies_after(monkeypatch):
+    f = GateFactory(build_delay=0.3)
+    d = make(f)
+    down = asyncio.create_task(d.handle({"cmd": "ptt_down"}))
+    await asyncio.sleep(0.05)
+    # simulate a long hold released while the pipeline is still being built
+    d._ptt._down_at -= 1.0
+    await d.handle({"cmd": "ptt_up"})
+    await down
+    assert f.gate.is_open is False

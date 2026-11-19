@@ -25,6 +25,7 @@ from omarum.store import Store
 from omarum.claude_code_llm import ClaudeCodeLLMService
 from omarum.config import Config
 from omarum.levels import LatencyClock, StateTap
+from omarum.micgate import MicGate
 from omarum.recorder import Session, TranscriptTap
 from omarum.voices import available_voices, build_tts, load_env_file, voice_chain
 from omarum.turns import mute_strategies, turn_strategies, vad_params
@@ -74,8 +75,11 @@ def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, C
             user_mute_strategies=mute_strategies(cfg),
         ),
     )
+    gate = MicGate(open_=True)
+    session.gate = gate  # the daemon opens/closes it for push-to-talk and uses it to interrupt
     pipeline = Pipeline([
         transport.input(),
+        gate,
         StateTap(emit, "user", clock),
         stt,
         TranscriptTap(session.transcript, "user"),
