@@ -39,6 +39,8 @@ class Config:
     whisper_no_speech_prob: float = 0.3
     whisper_ttfs_p99: float = 0.05  # turn already starts from a transcript; skip the STT safety wait
     idle_timeout_secs: float = 8.0
+    record_audio: bool = True  # keep both voices of every conversation (spec §8)
+    retention_days: int = 0  # 0 = keep conversations forever
     audio_release_secs: float = 0.6  # pause between sessions so the audio device is fully closed
     orb_position: str = "top-right"
 
