@@ -176,3 +176,19 @@ async def test_user_voice_keeps_session_alive():
     assert d.state == "listening"  # not closed while the user is talking
     await asyncio.sleep(0.5)
     assert d.state == "closed"  # silence afterwards still closes it
+
+
+async def test_new_session_waits_for_audio_release_after_stop():
+    f = FakeFactory()
+    d = make(f, audio_release_secs=0.3)
+    await d.handle({"cmd": "start"})
+    t0 = time.monotonic()
+    await asyncio.gather(d.handle({"cmd": "toggle"}), d.handle({"cmd": "start"}))
+    # the second start may only open audio after the first session released it
+    assert f.starts in (1, 2)
+    if f.starts == 2:
+        assert time.monotonic() - t0 >= 0.3
+    await d.handle({"cmd": "stop"})
+    t1 = time.monotonic()
+    await d.handle({"cmd": "start"})
+    assert time.monotonic() - t1 >= 0.25  # start right after stop is delayed, not raced

@@ -47,6 +47,7 @@ class Daemon:
         self._watchdog: asyncio.Task | None = None
         self._listening_since = time.monotonic()
         self._session = 0  # bumps on every start/end; stale sessions' events are dropped
+        self._audio_free_at = 0.0  # monotonic time when the last session's audio threads are done
 
     # -- events from the pipeline -------------------------------------------
     def _emitter(self, session: int):
@@ -111,6 +112,11 @@ class Daemon:
             return self._reply(ok=False)
         self._starting = True
         try:
+            # PyAudio write threads outlive a cancelled pipeline briefly; reopening ALSA
+            # while one still writes to the closed stream segfaults (seen 2026-11-19).
+            wait = self._audio_free_at - time.monotonic()
+            if wait > 0:
+                await asyncio.sleep(wait)
             self._session += 1
             emit = self._emitter(self._session)
             task, self._stop = await asyncio.to_thread(self._factory, self.cfg, emit)
@@ -151,6 +157,7 @@ class Daemon:
             await asyncio.wait_for(asyncio.shield(runner), 3)
         except asyncio.TimeoutError:
             runner.cancel()
+        self._audio_free_at = time.monotonic() + self.cfg.audio_release_secs
         if self.state != "error":
             self._set_state("closed")
         return self._reply()
