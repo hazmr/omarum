@@ -2,15 +2,15 @@
   "schemaVersion": 1,
   "id": "omarum.panel",
   "name": "Omarum",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": "hazmr",
   "license": "MIT",
-  "description": "Talk to Rum: an orb in the bar that breathes while Rum is open. Click for the panel (hands-free, engine, last conversation, settings); right-click for hands-free.",
+  "description": "Rum, a voice companion for Omarchy, as one plugin: the orb, the voice engine, the shortcut and a bar panel. Install with omarchy plugin add; remove with omarchy plugin remove.",
   "kinds": [
     "bar-widget"
   ],
   "entryPoints": {
-    "barWidget": "OmarumPanel.qml"
+    "barWidget": "plugin/OmarumPanel.qml"
   },
   "barWidget": {
     "displayName": "Omarum",
