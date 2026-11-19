@@ -79,6 +79,29 @@ def last_user_text(messages: list) -> str:
     return ""
 
 
+def user_content(messages: list):
+    """The last user message for Claude: plain text, or image blocks plus text (a screenshot)."""
+    for m in reversed(messages):
+        if m.get("role") != "user":
+            continue
+        content = m.get("content")
+        if not isinstance(content, list):
+            return content if isinstance(content, str) else ""
+        images, texts = [], []
+        for p in content:
+            if not isinstance(p, dict):
+                continue
+            if p.get("type") == "image_url":
+                url = p.get("image_url", {}).get("url", "")
+                if url.startswith("data:") and ";base64," in url:
+                    media, data = url[5:].split(";base64,", 1)
+                    images.append({"type": "image", "source": {"type": "base64", "media_type": media, "data": data}})
+            elif p.get("type") == "text":
+                texts.append(p.get("text", ""))
+        return images + [{"type": "text", "text": " ".join(texts)}] if images else " ".join(texts)
+    return ""
+
+
 class ClaudeCodeLLMService(LLMService):
     reports_own_errors = True  # through on_error, with a better reason
 
@@ -141,7 +164,7 @@ class ClaudeCodeLLMService(LLMService):
             elif kind == "text" and self._turns_done == turn and text:
                 yield text
 
-    async def _respond(self, text: str) -> None:
+    async def _respond(self, text) -> None:
         proc = await self._ensure_process()
         turn = self._turns_sent
         self._turns_sent += 1
@@ -158,11 +181,11 @@ class ClaudeCodeLLMService(LLMService):
     async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
         await super().process_frame(frame, direction)
         if isinstance(frame, LLMContextFrame):
-            text = last_user_text(frame.context.get_messages())
-            if not text.strip():
+            messages = frame.context.get_messages()
+            if not last_user_text(messages).strip():
                 return
             try:
-                await self._respond(text)
+                await self._respond(user_content(messages))  # text, or a screenshot plus text
             except BrainUnavailable as exc:
                 logger.error(f"brain unavailable: {exc}")
                 await self.push_error(ErrorFrame(error=str(exc)))

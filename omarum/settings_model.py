@@ -49,6 +49,8 @@ ROWS: list[Row] = [
     Row("Companion", "Conversation", "Words needed to interrupt", "interrupt_min_words", "slider", (1, 6, 1, "")),
     Row("Companion", "Conversation", "Mute mic while talking", "mute_while_speaking", "toggle",
         hint="stops your companion hearing itself through the speakers"),
+    Row("Companion", "Awareness", "Look at my screen when I ask", "screen_look", "toggle",
+        hint="\"look at my screen\", \"what do you see?\": one screenshot, sent to your brain"),
     Row("Companion", "Awareness", "See the code you're looking at", "screen_awareness", "toggle",
         hint="when you talk with IntelliJ or VS Code focused, Rum reads that file (sent to your brain)"),
     Row("Companion", "Shortcuts", "Talk key", "talk_shortcut", "shortcut",

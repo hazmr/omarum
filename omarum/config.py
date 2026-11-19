@@ -51,6 +51,7 @@ class Config:
     orb_style: str = "glow"  # glow | lines | ring
     orb_size: int = 160  # px, 96-320
     orb_colors: str = "theme"  # theme | warm | glass | mono
+    screen_look: bool = True  # "look at my screen": Rum takes one screenshot, only when you ask
     screen_awareness: bool = True  # Rum sees the file open in a focused code editor (IntelliJ, VS Code) when you talk
     talk_shortcut: str = "CTRL + SHIFT + SPACE"  # tap tap = open/close, hold = your turn, tap = stop Rum; "" = none
     settings_shortcut: str = ""  # opens the settings window; "" = none

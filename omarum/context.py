@@ -8,6 +8,11 @@ from omarum import persona
 from omarum.config import Config
 
 RECENT_JOURNALS = 3
+LOOK_GUIDE = """\
+## Looking at their screen
+When they ask you to look ("look at my screen", "what do you see?"), a screenshot of their screen, taken right then, comes with what they say. Talk about it like a friend glancing over their shoulder: what matters for what they asked, in a sentence or two. Don't list everything on screen and never read long text aloud. If no screenshot came with it, say you couldn't see it this time.
+"""
+
 CODE_GUIDE = """\
 ## Code on their screen
 When they're in a code editor, the file they have open comes with what they say, marked "On screen". Use it only when they talk about it ("what does this do?", "why is this here?").
@@ -67,6 +72,8 @@ def build_system_prompt(cfg: Config, store, now: datetime) -> str:
         sections.append(f"## Earlier today\n{today}")
     if getattr(cfg, "screen_awareness", False):
         sections.append(CODE_GUIDE.strip())
+    if getattr(cfg, "screen_look", False):
+        sections.append(LOOK_GUIDE.strip())
     from omarum import firstmeet
 
     if firstmeet.is_first_meeting(store):

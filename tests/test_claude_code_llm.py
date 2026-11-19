@@ -52,3 +52,14 @@ async def test_start_prewarms_claude_process(monkeypatch):
     svc = ClaudeCodeLLMService(model="haiku", system_prompt="hi")
     await svc._prewarm()
     assert len(spawned) == 1 and spawned[0][0] == "claude"
+
+
+def test_screenshot_goes_to_claude_as_an_image_block():
+    from omarum.claude_code_llm import user_content
+
+    msgs = [{"role": "user", "content": [{"type": "text", "text": "what do you see?"},
+                                         {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,QUJD"}}]}]
+    content = user_content(msgs)
+    assert content[0] == {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": "QUJD"}}
+    assert content[1] == {"type": "text", "text": "what do you see?"}
+    assert user_content([{"role": "user", "content": "hi"}]) == "hi"

@@ -88,3 +88,17 @@ def test_code_explaining_guidance_only_when_awareness_is_on(tmp_path):
     on = build_system_prompt(Config(screen_awareness=True), store, datetime(2026, 11, 19, 20, 0))
     off = build_system_prompt(Config(screen_awareness=False), store, datetime(2026, 11, 19, 20, 0))
     assert "## Code on their screen" in on and "## Code on their screen" not in off
+
+
+def test_screen_look_guidance_only_when_on(tmp_path):
+    from datetime import datetime
+
+    from omarum.config import Config
+    from omarum.context import build_system_prompt
+    from omarum.store import Store
+
+    store = Store(tmp_path)
+    store.ensure()
+    now = datetime(2026, 11, 19, 20, 0)
+    assert "## Looking at their screen" in build_system_prompt(Config(screen_look=True), store, now)
+    assert "## Looking at their screen" not in build_system_prompt(Config(screen_look=False), store, now)

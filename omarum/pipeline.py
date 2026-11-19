@@ -105,7 +105,9 @@ def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, C
         TranscriptTap(session.transcript, "user"),
         aggregators.user(),
         breaker,
-        *([ScreenContext()] if cfg.screen_awareness else []),  # the code on screen goes with what you said
+        # The code on screen, and a screenshot when you ask Rum to look, go with what you said.
+        *([ScreenContext(code=cfg.screen_awareness, look=cfg.screen_look)]
+          if cfg.screen_awareness or cfg.screen_look else []),
         llm,
         TranscriptTap(session.transcript, "companion"),
         tts,

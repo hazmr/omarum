@@ -53,3 +53,28 @@ def test_long_files_are_trimmed(tmp_path):
     f.write_text("".join(f"line {i}\n" for i in range(5000)))
     note = screen.note_for(f, tmp_path, "IntelliJ", screen.Seen())
     assert "line 0" in note and "line 4999" not in note and "trimmed" in note
+
+
+def test_asking_rum_to_look():
+    for said in ("Can you look at my screen?", "what do you see", "Look at this.", "can you see this error",
+                 "take a screenshot", "What's on my screen right now?", "check my screen"):
+        assert screen.wants_screenshot(said), said
+    for said in ("I see what you mean", "look, I'm tired", "let's take a break", "what do you think"):
+        assert not screen.wants_screenshot(said), said
+
+
+def test_screenshot_of_the_focused_monitor():
+    calls = []
+
+    class R:
+        def __init__(self, out): self.stdout, self.returncode = out, 0
+
+    def run(cmd, **kw):
+        calls.append(cmd)
+        if cmd[0] == "hyprctl":
+            return R('[{"name": "HDMI-A-1", "focused": false}, {"name": "eDP-2", "focused": true}]')
+        return R(b"\xff\xd8jpeg")
+
+    assert screen.capture_screenshot(run) == b"\xff\xd8jpeg"
+    grim = calls[-1]
+    assert grim[0] == "grim" and grim[grim.index("-o") + 1] == "eDP-2" and "jpeg" in grim

@@ -49,7 +49,10 @@ def _text(content) -> str:
     if isinstance(content, str):
         return content
     if isinstance(content, list):
-        return " ".join(p.get("text", "") for p in content if isinstance(p, dict))
+        parts = [p.get("text", "") if p.get("type") == "text"
+                 else "[They showed you a screenshot, but you can't see images with this brain: tell them so.]"
+                 for p in content if isinstance(p, dict) and p.get("type") in ("text", "image_url")]
+        return " ".join(parts)
     return ""
 
 

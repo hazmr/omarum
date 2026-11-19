@@ -120,3 +120,27 @@ def current_note(seen: Seen, run=subprocess.run, home: Path = Path.home()) -> st
         return note_for(path, root, editor_label(win[0]), seen)
     except OSError:
         return ""
+
+
+_LOOK = re.compile(
+    r"\b(look(ing)? at (my |the |this |that )?(screen|this|that|it)\b"
+    r"|what (do|can) you see|can you see (this|that|it|my screen|the screen|what)"
+    r"|what'?s on (my|the) screen|(take|grab) a screenshot|screenshot|(check|see) (my|the) screen)",
+    re.IGNORECASE)
+
+
+def wants_screenshot(said: str) -> bool:
+    """Did they ask Rum to look at their screen?"""
+    return bool(_LOOK.search(said or ""))
+
+
+def capture_screenshot(run=subprocess.run) -> bytes | None:
+    """A JPEG of the monitor they're on (about 100 KB), or None."""
+    try:
+        mons = json.loads(run(["hyprctl", "monitors", "-j"], capture_output=True, text=True, timeout=3).stdout or "[]")
+        name = next((m["name"] for m in mons if m.get("focused")), mons[0]["name"] if mons else None)
+        cmd = ["grim"] + (["-o", name] if name else []) + ["-t", "jpeg", "-q", "70", "-s", "0.8", "-"]
+        r = run(cmd, capture_output=True, timeout=5)
+    except (OSError, ValueError, KeyError, IndexError, subprocess.SubprocessError):
+        return None
+    return r.stdout if r.returncode == 0 and r.stdout else None
