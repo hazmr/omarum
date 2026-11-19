@@ -19,7 +19,7 @@ from pipecat.services.whisper.stt import WhisperSTTService
 from pipecat.transports.local.audio import LocalAudioTransport, LocalAudioTransportParams
 
 from omarum import persona
-from omarum.claude_code_llm import DATA_DIR, ClaudeCodeLLMService
+from omarum.claude_code_llm import ClaudeCodeLLMService
 from omarum.config import Config
 from omarum.levels import LatencyClock, StateTap
 from omarum.voices import build_tts, load_env_file

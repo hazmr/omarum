@@ -63,6 +63,8 @@ class Daemon:
             if new == "listening" and self.state == "user_speaking":
                 return  # the companion stopped because the user interrupted
             self._set_state(new, msg.get("reason"))
+            if new == "error" and self._active:
+                asyncio.create_task(self._end())  # a broken session must not keep the mic open
         else:
             if msg.get("who") == "user" and msg.get("value", 0) >= USER_VOICE_THRESHOLD:
                 self._listening_since = time.monotonic()  # the user is talking: not idle
@@ -126,17 +128,23 @@ class Daemon:
             return self._reply(ok=False)
         finally:
             self._starting = False
-        self._runner = asyncio.create_task(self._run(task))
+        self._runner = asyncio.create_task(self._run(task, self._session))
         self._watchdog = asyncio.create_task(self._watch_idle())
         self._set_state("listening")
         return self._reply()
 
-    async def _run(self, task) -> None:
+    async def _run(self, task, session: int) -> None:
         try:
             await self._run_task(task)
         except Exception as exc:
             logger.exception("session crashed")
             self._set_state("error", str(exc))
+        finally:
+            if session == self._session:  # ended on its own, not through _end()
+                self._session += 1
+                self._audio_free_at = time.monotonic() + self.cfg.audio_release_secs
+                if self.state != "error":
+                    self._set_state("closed")
 
     async def _watch_idle(self) -> None:
         while self._active:

@@ -5,7 +5,6 @@ from __future__ import annotations
 import array
 import json
 import os
-import shutil
 import subprocess
 from collections.abc import AsyncGenerator
 from pathlib import Path

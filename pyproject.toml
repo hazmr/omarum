@@ -1,6 +1,7 @@
 [project]
 name = "omarum"
 version = "0.1.0"
+license = "MIT"
 description = "Omarum: a voice companion for Omarchy"
 requires-python = ">=3.12,<3.13"
 dependencies = [

@@ -39,6 +39,7 @@ class FakeFactory:
             self.stops += 1
             done.set()
 
+        self.finish = done.set  # lets a test end the "pipeline" on its own
         return done, stop
 
 
@@ -192,3 +193,28 @@ async def test_new_session_waits_for_audio_release_after_stop():
     t1 = time.monotonic()
     await d.handle({"cmd": "start"})
     assert time.monotonic() - t1 >= 0.25  # start right after stop is delayed, not raced
+
+
+async def test_session_that_ends_by_itself_is_closed_and_cools_down():
+    f = FakeFactory()
+    d = make(f, audio_release_secs=0.3)
+    await d.handle({"cmd": "start"})
+    f.emit({"type": "state", "state": "speaking"})
+    f.finish()  # the pipeline finishes on its own (not via toggle)
+    await asyncio.sleep(0.1)
+    assert d.state == "closed"
+    t0 = time.monotonic()
+    await d.handle({"cmd": "start"})
+    assert time.monotonic() - t0 >= 0.15  # audio cooldown still applies
+
+
+async def test_brain_error_closes_the_session_and_mic():
+    f = FakeFactory()
+    d = make(f)
+    await d.handle({"cmd": "start"})
+    f.emit({"type": "state", "state": "error", "reason": "usage limit reached"})
+    await asyncio.sleep(0.2)
+    assert f.stops == 1            # pipeline (and microphone) stopped
+    assert d.state == "error"      # the orb still shows the error
+    r = await d.handle({"cmd": "status"})
+    assert "usage limit" in r["reason"]
