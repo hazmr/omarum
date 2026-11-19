@@ -159,3 +159,77 @@ def make_llm(cfg, env: dict, system_prompt: str, on_error=None, factories: dict 
     base_url = cfg.brain_url.strip() if p.id == "custom" else p.base_url
     key = env.get(p.env_key, "") if p.env_key else ""
     return f["openai"](api_key=key or "ollama", model=model, base_url=base_url)
+
+
+def _post_json(url: str, body: dict, headers: dict, urlopen, timeout: int) -> dict:
+    import json
+    import urllib.request
+
+    req = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST",
+                                 headers={"Content-Type": "application/json", **headers})
+    with urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read())
+
+
+def complete(cfg, env: dict, system: str, prompt: str, timeout: int = 120,
+             urlopen=None, run_cli=None, which=shutil.which) -> str:
+    """One answer from the configured brain, without the voice loop (memory passes).
+
+    Claude Code is handled by memory.run_claude; everything else is here. Raises BrainUnavailable.
+    """
+    import urllib.request
+
+    reason = not_ready_reason(cfg, env, which)
+    if reason:
+        raise BrainUnavailable(reason)
+    p, model = resolve(cfg)
+    urlopen = urlopen or urllib.request.urlopen
+    try:
+        if p.kind == "cli":
+            import subprocess
+
+            from omarum.cli_llm import SANDBOX as sandbox
+
+            sandbox.mkdir(parents=True, exist_ok=True)
+            cmd, stdin = _cli_command(p.id, model, f"{system}\n\n{prompt}")
+            r = (run_cli or subprocess.run)(cmd, input=stdin, capture_output=True, text=True,
+                                            timeout=timeout, cwd=sandbox)
+            if r.returncode != 0:
+                raise BrainUnavailable(_cli_error(p.id, r.stderr or "", r.returncode))
+            return r.stdout
+        if p.kind == "anthropic":
+            data = _post_json("https://api.anthropic.com/v1/messages",
+                              {"model": model, "max_tokens": 4096, "system": system,
+                               "messages": [{"role": "user", "content": prompt}]},
+                              {"x-api-key": env[p.env_key], "anthropic-version": "2023-06-01"}, urlopen, timeout)
+            return "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
+        if p.kind == "gemini":
+            data = _post_json(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                              {"systemInstruction": {"parts": [{"text": system}]},
+                               "contents": [{"role": "user", "parts": [{"text": prompt}]}]},
+                              {"x-goog-api-key": env[p.env_key]}, urlopen, timeout)
+            parts = data["candidates"][0]["content"]["parts"]
+            return "".join(part.get("text", "") for part in parts)
+        base = (cfg.brain_url.strip() if p.id == "custom" else p.base_url).rstrip("/")
+        key = (env.get(p.env_key, "") if p.env_key else "") or "ollama"
+        data = _post_json(f"{base}/chat/completions",
+                          {"model": model, "messages": [{"role": "system", "content": system},
+                                                        {"role": "user", "content": prompt}]},
+                          {"Authorization": f"Bearer {key}"}, urlopen, timeout)
+        return data["choices"][0]["message"]["content"] or ""
+    except BrainUnavailable:
+        raise
+    except Exception as exc:  # network, HTTP error, unexpected reply shape, timeout
+        raise BrainUnavailable(f"{p.label} failed: {str(exc)[:160]}") from exc
+
+
+def _cli_command(pid, model, prompt):
+    from omarum.cli_llm import cli_command  # pipecat-free helpers live there too
+
+    return cli_command(pid, model, prompt)
+
+
+def _cli_error(pid, stderr, code):
+    from omarum.cli_llm import error_reason
+
+    return error_reason(pid, stderr, code)

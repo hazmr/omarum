@@ -112,3 +112,80 @@ def test_make_llm_not_ready_reasons():
     with pytest.raises(BrainUnavailable, match="model"):
         _make(Config(brain="custom", brain_url="http://x/v1", brain_model=""), {}, rec)
     assert rec.calls == []
+
+
+class FakeResponse:
+    def __init__(self, body):
+        import json
+        self.body = json.dumps(body).encode()
+
+    def read(self):
+        return self.body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+def _capture(body):
+    seen = {}
+
+    def urlopen(req, timeout=None):
+        import json
+        seen["url"] = req.full_url
+        seen["headers"] = {k.lower(): v for k, v in req.header_items()}
+        seen["json"] = json.loads(req.data)
+        return FakeResponse(body)
+    return seen, urlopen
+
+
+def test_complete_openai_payload():
+    seen, urlopen = _capture({"choices": [{"message": {"content": "- likes tea"}}]})
+    out = brains.complete(Config(brain="groq"), {"GROQ_API_KEY": "g"}, "SYS", "PROMPT", urlopen=urlopen)
+    assert out == "- likes tea"
+    assert seen["url"] == "https://api.groq.com/openai/v1/chat/completions"
+    assert seen["headers"]["authorization"] == "Bearer g"
+    assert seen["json"]["model"] == "llama-3.3-70b-versatile"
+    assert seen["json"]["messages"] == [{"role": "system", "content": "SYS"}, {"role": "user", "content": "PROMPT"}]
+
+
+def test_complete_anthropic_and_gemini_payloads():
+    seen, urlopen = _capture({"content": [{"type": "text", "text": "hi"}]})
+    assert brains.complete(Config(brain="anthropic"), {"ANTHROPIC_API_KEY": "a"}, "SYS", "P", urlopen=urlopen) == "hi"
+    assert seen["url"] == "https://api.anthropic.com/v1/messages"
+    assert seen["headers"]["x-api-key"] == "a" and seen["json"]["system"] == "SYS"
+
+    seen, urlopen = _capture({"candidates": [{"content": {"parts": [{"text": "a"}, {"text": "b"}]}}]})
+    assert brains.complete(Config(brain="gemini"), {"GEMINI_API_KEY": "k"}, "SYS", "P", urlopen=urlopen) == "ab"
+    assert seen["url"].endswith("/models/gemini-2.5-flash:generateContent")
+    assert seen["headers"]["x-goog-api-key"] == "k"
+    assert "k" not in seen["url"].split("models/")[0]  # the key never goes in the URL
+
+
+def test_complete_cli_one_shot(tmp_path):
+    calls = {}
+
+    class Done:
+        returncode, stdout, stderr = 0, "- a fact\n", ""
+
+    def run(cmd, **kw):
+        calls["cmd"], calls["kw"] = cmd, kw
+        return Done()
+
+    out = brains.complete(Config(brain="qwen"), {}, "SYS", "PROMPT", run_cli=run, which=lambda b: "/x/" + b)
+    assert out == "- a fact\n" and calls["cmd"][0] == "qwen"
+    assert calls["kw"]["input"].startswith("SYS") and "PROMPT" in calls["kw"]["input"]
+
+
+def test_complete_errors_are_brain_unavailable():
+    import pytest
+
+    def urlopen(req, timeout=None):
+        raise OSError("connection refused")
+
+    with pytest.raises(brains.BrainUnavailable, match="Ollama"):
+        brains.complete(Config(brain="ollama"), {}, "S", "P", urlopen=urlopen)
+    with pytest.raises(brains.BrainUnavailable, match="needs an API key"):
+        brains.complete(Config(brain="openai"), {}, "S", "P", urlopen=urlopen)

@@ -98,3 +98,35 @@ def test_valid_profile_rules():
     assert not valid_profile("")
     assert not valid_profile("Here you go:\n- a")
     assert not valid_profile("\n".join(f"- fact {i}" for i in range(201)))
+
+
+def test_memory_follows_the_brain_and_falls_back_to_claude(monkeypatch):
+    from omarum import brains, memory
+    from omarum.config import Config
+
+    asked = []
+    monkeypatch.setattr(brains, "complete", lambda cfg, env, s, p, **kw: asked.append(cfg.brain) or "from-gemini")
+    run = memory.brain_runner(Config(brain="gemini"), env={"GEMINI_API_KEY": "k"})
+    assert run("S", "P") == "from-gemini" and asked == ["gemini"]
+
+    def broken(cfg, env, s, p, **kw):
+        raise brains.BrainUnavailable("down")
+
+    monkeypatch.setattr(brains, "complete", broken)
+    monkeypatch.setattr(memory, "run_claude", lambda s, p, model="haiku", timeout=120: "from-claude")
+    monkeypatch.setattr(memory.shutil, "which", lambda name: "/usr/bin/claude")
+    assert memory.brain_runner(Config(brain="gemini"), env={})("S", "P") == "from-claude"
+
+    monkeypatch.setattr(memory.shutil, "which", lambda name: None)
+    import pytest
+
+    with pytest.raises(memory.MemoryPassFailed, match="down"):
+        memory.brain_runner(Config(brain="gemini"), env={})("S", "P")
+
+
+def test_memory_on_claude_code_uses_its_model(monkeypatch):
+    from omarum import memory
+    from omarum.config import Config
+
+    monkeypatch.setattr(memory, "run_claude", lambda s, p, model="haiku", timeout=120: f"claude:{model}")
+    assert memory.brain_runner(Config(brain="claude-code", brain_model="sonnet"), env={})("S", "P") == "claude:sonnet"

@@ -1,6 +1,6 @@
 """After a conversation, Rum updates what it knows about the user; once a day it writes a journal.
 
-Both passes run through the user's own isolated `claude` CLI. A failed or nonsensical pass
+Both passes run on the brain the user chose (falling back to their `claude` CLI). A failed or nonsensical pass
 never touches the existing files: memory is only ever replaced by something valid.
 """
 
@@ -61,6 +61,32 @@ def run_claude(system: str, prompt: str, model: str = "haiku", timeout: int = 12
     return result.stdout
 
 
+def brain_runner(cfg, env: dict | None = None) -> RunClaude:
+    """run(system, prompt) on the chosen brain; falls back to the Claude CLI if that brain fails."""
+    from omarum import brains
+
+    if env is None:
+        import os
+
+        from omarum.voices import load_env_file
+
+        env = {**load_env_file(), **os.environ}
+    p, model = brains.resolve(cfg)
+
+    def run(system: str, prompt: str) -> str:
+        if p.id == "claude-code":
+            return run_claude(system, prompt, model=model or "haiku")
+        try:
+            return brains.complete(cfg, env, system, prompt)
+        except brains.BrainUnavailable as exc:
+            if shutil.which("claude") is None:
+                raise MemoryPassFailed(str(exc)) from exc
+            logger.warning(f"memory: {exc}; using the claude CLI instead")
+            return run_claude(system, prompt)
+
+    return run
+
+
 def valid_profile(text: str) -> bool:
     lines = [l for l in text.strip().splitlines() if l.strip()]
     return 0 < len(lines) <= MAX_PROFILE_LINES and all(l.lstrip().startswith("- ") for l in lines)
@@ -71,7 +97,8 @@ def _dialogue(transcript: list[dict], cfg) -> str:
     return "\n".join(f"{names.get(r.get('who'), r.get('who'))}: {r['text']}" for r in transcript)
 
 
-def update_profile(store, transcript: list[dict], cfg, run: RunClaude = run_claude) -> bool:
+def update_profile(store, transcript: list[dict], cfg, run: RunClaude | None = None) -> bool:
+    run = run or brain_runner(cfg)
     if not transcript:
         return False
     current = store.profile_path.read_text() if store.profile_path.exists() else ""
@@ -92,7 +119,8 @@ def update_profile(store, transcript: list[dict], cfg, run: RunClaude = run_clau
     return True
 
 
-def write_journal(store, day: date, cfg, run: RunClaude = run_claude) -> bool:
+def write_journal(store, day: date, cfg, run: RunClaude | None = None) -> bool:
+    run = run or brain_runner(cfg)
     path = store.journal_path(day)
     if path.exists():
         return False
