@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+from omarum import brains
 from omarum.theme import RGB, vivid
 
 VOICE_NAMES = {"elevenlabs": "ElevenLabs", "zonos3": "ZONOS3", "kokoro": "Kokoro", "piper": "Piper"}
@@ -52,7 +53,7 @@ def summary(cfg, talks, today: date, has_gpu: bool, palette: dict[str, RGB]) -> 
     last = talks[0] if talks else None
     return {
         "name": cfg.companion_name,
-        "brain": f"Claude · {cfg.brain_model}",
+        "brain": brains.label(cfg),
         "ears": ears_label(cfg, has_gpu),
         "voice": voice_label(cfg),
         "shortcut": shortcut_label(cfg.talk_shortcut),

@@ -74,3 +74,37 @@ def test_tab_index_by_name():
     assert tab_index("Engine") == 1
     assert tab_index("") == 0
     assert tab_index("nope") == 0
+
+
+def test_brain_rows_follow_the_provider():
+    from omarum.settings_model import rows_for
+
+    def brain_rows(brain):
+        return [r for r in rows_for("Engine", brain=brain, brain_status=lambda p: "ready") if r.group == "Brain"]
+
+    rows = brain_rows("claude-code")
+    assert [r.label for r in rows] == ["Brain", "Model"]
+    assert rows[0].key == "brain" and "codex" in rows[0].options and "ollama" in rows[0].options
+    assert rows[1].kind == "model" and rows[1].options == ("haiku", "sonnet", "opus")
+
+    rows = brain_rows("gemini")
+    assert [r.label for r in rows] == ["Brain", "Model", "API key"]
+    assert rows[2].key == "GEMINI_API_KEY" and rows[2].kind == "secret"
+
+    rows = brain_rows("custom")
+    assert [r.label for r in rows] == ["Brain", "Model", "Endpoint", "API key"]
+    assert rows[2].key == "brain_url" and rows[2].kind == "text"
+
+    assert [r.label for r in brain_rows("ollama")] == ["Brain", "Model"]
+
+
+def test_brain_and_model_display_and_step():
+    from omarum.settings_model import display, rows_for, step
+
+    rows = {r.label: r for r in rows_for("Engine", brain="codex", brain_status=lambda p: "not installed")}
+    assert display(rows["Brain"], "codex") == "Codex (subscription)"
+    assert "not installed" in rows["Brain"].hint
+    assert display(rows["Model"], "") == "default"
+    assert step(rows["Model"], "", +1) == "gpt-5"
+    assert step(rows["Model"], "my-own", +1) == ""  # unknown → back to the first suggestion
+    assert step(rows["Brain"], "codex", +1) == "gemini-cli"

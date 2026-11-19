@@ -6,6 +6,7 @@ omarum.settings_model (rows), omarum.configio (saving), omarum.library (memory, 
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -19,7 +20,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Gdk", "4.0")
 from gi.repository import Gdk, GLib, Gtk, Pango  # noqa: E402
 
-from omarum import library, settings_model as sm  # noqa: E402
+from omarum import brains, library, settings_model as sm  # noqa: E402
 from omarum.config import load_config  # noqa: E402
 from omarum.configio import has_secret, save_config, set_secret  # noqa: E402
 from omarum.ipc import DaemonNotRunning, send_command  # noqa: E402
@@ -114,7 +115,7 @@ class Settings(Gtk.ApplicationWindow):
         tab = sm.TABS[self.tab]
         items: list[Item] = []
         group = None
-        for r in sm.rows_for(tab):
+        for r in sm.rows_for(tab, brain=self.values.get("brain", "claude-code"), brain_status=self.brain_status):
             if r.group != group:
                 group = r.group
                 items.append(Item("group", group))
@@ -144,16 +145,29 @@ class Settings(Gtk.ApplicationWindow):
                 items.append(Item("info", "No conversations yet", data=None))
         return items
 
+    def brain_env(self) -> dict:
+        keys = {p.env_key for p in brains.PROVIDERS.values() if p.env_key}
+        return {**os.environ, **{k: "set" for k in keys if has_secret(k)}}
+
+    def brain_status(self, p) -> str:
+        return brains.status(p, self.brain_env(), shutil.which, self.values.get("brain_url", ""))
+
     def status(self) -> list[tuple[str, bool, str]]:
         whisper = sorted(p.name for p in (MODELS_DIR / "whisper").glob("*") if (p / "model.bin").exists()) \
             if (MODELS_DIR / "whisper").is_dir() else []
         return [
-            ("Claude CLI", shutil.which("claude") is not None, "your subscription is the brain"),
+            ("Brain", brains.not_ready_reason(self.dataclass_cfg(), self.brain_env()) is None,
+             brains.not_ready_reason(self.dataclass_cfg(), self.brain_env()) or brains.label(self.dataclass_cfg())),
             ("ZONOS3 voice", zonos3_installed(), "local voice server"),
             ("Kokoro voice", (MODELS_DIR / "kokoro" / "kokoro-v1.0.onnx").exists(), "always-there fallback"),
             ("Whisper models", bool(whisper), ", ".join(whisper) or "downloaded on first use"),
             ("ElevenLabs key", has_secret("ELEVENLABS_API_KEY"), "optional cloud voice"),
         ]
+
+    def dataclass_cfg(self):
+        from omarum.config import Config
+
+        return Config(**self.values)
 
     def value_of(self, r: sm.Row):
         return has_secret(r.key) if r.kind == "secret" else self.values.get(r.key)
@@ -271,7 +285,7 @@ class Settings(Gtk.ApplicationWindow):
             v = Gtk.Label(label=("[■■  on ]" if value else "[ off ■■]"))
             v.add_css_class("value")
             return v
-        if r.kind == "cycle":
+        if r.kind in ("cycle", "model"):
             box = Gtk.Box(spacing=8)
             for text, cls in (("‹", "arrow"), (sm.display(r, value).center(18), "value"), ("›", "arrow")):
                 lab = Gtk.Label(label=text)
@@ -302,11 +316,13 @@ class Settings(Gtk.ApplicationWindow):
         new = sm.step(it.row, self.value_of(it.row), direction)
         if new != self.value_of(it.row):
             self.save(it.row.key, new)
+            if it.row.key == "brain":
+                self.save("brain_model", "")  # the old model name belongs to the old brain
         self.render()
 
     def activate(self) -> None:
         it = self.items[self.index]
-        if it.kind == "setting" and it.row.kind in ("text", "secret"):
+        if it.kind == "setting" and it.row.kind in ("text", "secret", "model"):
             self.start_edit(it.row)
         elif it.kind == "setting" and it.row.kind == "shortcut":
             self.capturing = it.row
@@ -340,7 +356,7 @@ class Settings(Gtk.ApplicationWindow):
         if r.kind == "secret":
             set_secret(r.key, text.strip())
             self.flash("Key saved" if text.strip() else "Key removed")
-        elif text.strip():
+        elif text.strip() or r.kind == "model":  # an empty model means "the provider's default"
             self.save(r.key, text.strip())
         self.render()
 

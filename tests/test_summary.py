@@ -39,7 +39,7 @@ def test_summary_with_conversations():
              talk(date(2026, 11, 18), "09:30", 60)]
     s = summary(Config(companion_name="Rum", brain_model="sonnet"), talks, today, has_gpu=False, palette=PALETTE)
     assert s["name"] == "Rum"
-    assert s["brain"] == "Claude · sonnet"
+    assert s["brain"] == "Claude Code · sonnet"
     assert s["talks"] == 2
     assert s["last"] == {"text": "Could you continue building the app?", "when": "today 21:40", "length": "4m 12s"}
     # The bar and panel use the orb's own colors: vivid you / companion, plain idle.

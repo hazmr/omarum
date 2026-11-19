@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from omarum.brains import PROVIDERS
+
 TABS = ("Companion", "Engine", "Memory", "Conversations")
 
 
@@ -26,7 +28,7 @@ class Row:
     group: str
     label: str
     key: str | None
-    kind: str  # cycle | seg | toggle | slider | text | secret | shortcut | info | action
+    kind: str  # cycle | seg | toggle | slider | text | secret | shortcut | info | action | model
     options: tuple = ()
     hint: str = ""
 
@@ -48,8 +50,6 @@ ROWS: list[Row] = [
         hint="Enter, then press the new keys"),
     Row("Companion", "Shortcuts", "Open settings", "settings_shortcut", "shortcut", hint="optional"),
     # Engine
-    Row("Engine", "Brain", "Model", "brain_model", "seg", ("haiku", "sonnet", "opus"),
-        hint="through your own claude CLI"),
     Row("Engine", "Voice", "Engine", "voice_primary", "seg", ("elevenlabs", "zonos3", "kokoro"),
         hint="falls back down this order if it fails"),
     Row("Engine", "Voice", "ZONOS3 voice", "zonos3_voice", "cycle",
@@ -70,11 +70,39 @@ def row(key: str) -> Row:
     return next(r for r in ROWS if r.key == key)
 
 
-def rows_for(tab: str) -> list[Row]:
-    return [r for r in ROWS if r.tab == tab]
+def brain_rows(brain: str, brain_status=None) -> list[Row]:
+    """The Brain group for the chosen provider: which brain, its model, and what it needs."""
+    p = PROVIDERS.get(brain, PROVIDERS["claude-code"])
+    state = brain_status(p) if brain_status else ""
+    if p.kind == "cli" and state == "ready":
+        state = "installed (log in to it once: " + p.login_hint + ")"
+    how = "your own logged-in CLI" if p.kind == "cli" else ("runs on this computer" if p.group == "Local" else "your API key")
+    rows = [
+        Row("Engine", "Brain", "Brain", "brain", "cycle", tuple(PROVIDERS),
+            hint=f"{how}" + (f" · {state}" if state else "") + (f" · then: {p.login_hint}" if p.kind == "cli" and state not in ("", "ready") else "")),
+        Row("Engine", "Brain", "Model", "brain_model", "model", tuple(m for m in p.models) or ("",),
+            hint="←/→ suggestions · Enter to type any model name"),
+    ]
+    if p.id == "custom":
+        rows.append(Row("Engine", "Brain", "Endpoint", "brain_url", "text",
+                        hint="an OpenAI-compatible URL, e.g. http://localhost:1234/v1"))
+    if p.env_key:
+        rows.append(Row("Engine", "Brain", "API key", p.env_key, "secret",
+                        hint=f"{p.env_key} · Enter to set, empty to remove" + (" (optional)" if p.id == "custom" else "")))
+    return rows
+
+
+def rows_for(tab: str, brain: str = "claude-code", brain_status=None) -> list[Row]:
+    rows = [r for r in ROWS if r.tab == tab]
+    return brain_rows(brain, brain_status) + rows if tab == "Engine" else rows
 
 
 def display(r: Row, value) -> str:
+    if r.key == "brain":
+        p = PROVIDERS.get(value, PROVIDERS["claude-code"])
+        return f"{p.label} ({p.group.lower()})"
+    if r.kind == "model":
+        return value or "default"
     if r.kind == "shortcut":
         return " + ".join(p.capitalize() for p in value.split(" + ")) if value else "none"
     if r.kind == "toggle":
@@ -92,6 +120,9 @@ def display(r: Row, value) -> str:
 def step(r: Row, value, direction: int):
     if r.kind == "toggle":
         return not value
+    if r.kind == "model":
+        opts = r.options
+        return opts[(opts.index(value) + direction) % len(opts)] if value in opts else opts[0]
     if r.kind in ("cycle", "seg"):
         opts = r.options
         i = opts.index(value) if value in opts else 0
