@@ -24,7 +24,7 @@ from pipecat.processors.frame_processor import FrameDirection
 from pipecat.services.llm_service import LLMService
 from pipecat.services.settings import LLMSettings
 
-DATA_DIR = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share")) / "omarum"
+from omarum.paths import DATA_DIR  # noqa: E402  (re-exported for older imports)
 
 
 class BrainUnavailable(Exception):

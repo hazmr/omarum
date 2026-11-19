@@ -15,7 +15,7 @@ import shutil
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from omarum.claude_code_llm import DATA_DIR
+from omarum.paths import DATA_DIR
 
 
 class Store:

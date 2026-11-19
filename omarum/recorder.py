@@ -17,6 +17,8 @@ from pipecat.frames.frames import (
 )
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 
+from omarum.transcripts import read_transcript  # noqa: F401  (re-exported)
+
 
 class TranscriptWriter:
     """Append-only JSONL; every line is flushed and fsynced so a crash loses nothing said."""
@@ -35,22 +37,6 @@ class TranscriptWriter:
             f.flush()
             os.fsync(f.fileno())
         self.lines += 1
-
-
-def read_transcript(path: Path) -> list[dict]:
-    rows = []
-    try:
-        lines = Path(path).read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return rows
-    for line in lines:
-        try:
-            row = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(row, dict) and row.get("text"):
-            rows.append(row)
-    return rows
 
 
 class TranscriptTap(FrameProcessor):
