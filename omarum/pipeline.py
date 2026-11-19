@@ -49,6 +49,10 @@ def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, C
         # 80 ms output chunks (default 40): fewer chances to run dry under load, which crackles.
         LocalAudioTransportParams(audio_in_enabled=True, audio_out_enabled=True, audio_out_10ms_chunks=8)
     )
+    from omarum.volume import big_output_buffer
+
+    big_output_buffer(transport.output()._py_audio)  # no crackle when the machine is busy
+
     def whisper(model: str, device: str, compute: str) -> WhisperSTTService:
         logger.info(f"whisper: {model} on {device}")
         return WhisperSTTService(

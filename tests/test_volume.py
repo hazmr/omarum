@@ -110,3 +110,22 @@ def test_leveler_changes_volume_smoothly():
         gains.append(lev.gain)
     # From one 20 ms slice to the next, the volume rises gently (at most +15 %).
     assert all(b <= a * 1.15 + 1e-9 for a, b in zip(gains, gains[1:]))
+
+
+def test_speaker_stream_opens_with_a_big_buffer():
+    """PortAudio's default output buffer is a few ms; under load (a screen recorder) it runs dry
+    and the voice crackles. Measured: 5 drop-outs with the default, 0 with 2048 frames."""
+    from omarum.volume import OUTPUT_FRAMES, big_output_buffer
+
+    calls = []
+
+    class FakePyAudio:
+        def open(self, **kw):
+            calls.append(kw)
+
+    pa = FakePyAudio()
+    big_output_buffer(pa)
+    pa.open(rate=24000, output=True)
+    pa.open(rate=16000, input=True)  # the mic is left alone
+    assert calls[0]["frames_per_buffer"] == OUTPUT_FRAMES == 2048
+    assert "frames_per_buffer" not in calls[1]

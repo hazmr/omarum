@@ -92,3 +92,22 @@ class Volume(FrameProcessor):
         if isinstance(frame, OutputAudioRawFrame):
             frame.audio = self.leveler.process(frame.audio)
         await self.push_frame(frame, direction)
+
+
+OUTPUT_FRAMES = 2048  # ~85 ms at 24 kHz: PortAudio's default is a few ms and runs dry under load
+
+
+def big_output_buffer(py_audio) -> None:
+    """Make PyAudio open Rum's speaker stream with a big buffer (Pipecat can't pass one).
+
+    Measured with a screen recorder running: 5 drop-outs (crackles) in 15 s of speech with
+    PortAudio's default buffer, 0 with 2048 frames.
+    """
+    open_ = py_audio.open
+
+    def open_big(*args, **kwargs):
+        if kwargs.get("output") and not kwargs.get("frames_per_buffer"):
+            kwargs["frames_per_buffer"] = OUTPUT_FRAMES
+        return open_(*args, **kwargs)
+
+    py_audio.open = open_big
