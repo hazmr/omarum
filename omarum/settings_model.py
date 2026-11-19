@@ -6,6 +6,12 @@ from dataclasses import dataclass
 
 TABS = ("Companion", "Engine", "Memory", "Conversations")
 
+
+def tab_index(name: str) -> int:
+    """`omarum settings conversations` opens on that tab; anything else opens the first."""
+    names = [t.lower() for t in TABS]
+    return names.index(name.lower()) if name.lower() in names else 0
+
 FOOTERS = {
     "Companion": ["↑/↓ Select", "←/→ or Space Change", "Enter Edit", "Tab Next tab", "Q Close"],
     "Engine": ["↑/↓ Select", "←/→ or Space Change", "Enter Edit", "Tab Next tab", "Q Close"],

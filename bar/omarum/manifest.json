@@ -2,15 +2,19 @@
   "schemaVersion": 1,
   "id": "omarum.panel",
   "name": "Omarum",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "hazmr",
   "license": "MIT",
-  "description": "Talk to Rum: the orb lights up while Rum is open. Left-click for hands-free, right-click for settings.",
-  "kinds": ["bar-widget"],
-  "entryPoints": { "barWidget": "BarWidget.qml" },
+  "description": "Talk to Rum: an orb in the bar that breathes while Rum is open. Click for the panel (hands-free, engine, last conversation, settings); right-click for hands-free.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "OmarumPanel.qml"
+  },
   "barWidget": {
     "displayName": "Omarum",
-    "description": "Rum's state; left-click = hands-free on/off, right-click = settings.",
+    "description": "Rum's orb; click for the panel, right-click = hands-free on/off, middle-click = settings.",
     "category": "Status",
     "allowMultiple": false,
     "defaultSection": "right"

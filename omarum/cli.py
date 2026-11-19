@@ -11,7 +11,8 @@ from omarum.ipc import SOCKET_PATH, DaemonNotRunning, send_command
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="omarum", description="Talk to Rum.")
-    parser.add_argument("command", choices=["daemon", "toggle", "start", "stop", "status", "reload", "settings", "ptt_down", "ptt_up", "shortcuts", "tap", "watch"])
+    parser.add_argument("command", choices=["daemon", "toggle", "start", "stop", "status", "reload", "settings", "ptt_down", "ptt_up", "shortcuts", "tap", "watch", "summary"])
+    parser.add_argument("arg", nargs="?", default="", help="settings: the tab to open (companion, engine, memory, conversations)")
     args = parser.parse_args(argv)
 
     if args.command == "settings":
@@ -19,7 +20,15 @@ def main(argv: list[str] | None = None) -> None:
         from pathlib import Path
 
         launcher = Path(__file__).resolve().parent.parent / "bin" / "omarum-settings"
-        os.execv(str(launcher), [str(launcher)])
+        os.execv(str(launcher), [str(launcher)] + ([args.arg] if args.arg else []))
+
+    if args.command == "summary":  # for the bar panel
+        import json
+
+        from omarum import summary
+
+        print(json.dumps(summary.current()), flush=True)
+        return
 
     if args.command == "watch":  # for the bar button: one JSON line per state change
         import json

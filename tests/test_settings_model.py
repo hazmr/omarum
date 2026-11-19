@@ -65,3 +65,12 @@ def test_shortcut_rows_and_display():
 def test_voice_volume_row():
     r = row("voice_volume")
     assert display(r, 150) == "150%" and step(r, 300, +1) == 300 and step(r, 150, +1) == 160
+
+
+def test_tab_index_by_name():
+    from omarum.settings_model import tab_index
+
+    assert tab_index("conversations") == 3
+    assert tab_index("Engine") == 1
+    assert tab_index("") == 0
+    assert tab_index("nope") == 0

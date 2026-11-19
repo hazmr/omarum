@@ -501,7 +501,15 @@ class Settings(Gtk.ApplicationWindow):
 
 def main() -> None:
     app = Gtk.Application(application_id="org.omarchy.omarum.settings")
-    app.connect("activate", lambda a: Settings(a).present())
+    start_tab = sm.tab_index(sys.argv[1]) if len(sys.argv) > 1 else 0
+
+    def activate(a: Gtk.Application) -> None:
+        win = a.get_active_window() or Settings(a)
+        if start_tab:
+            win.switch_tab(start_tab)
+        win.present()
+
+    app.connect("activate", activate)
     app.run([])
 
 

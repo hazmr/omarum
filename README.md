@@ -27,7 +27,7 @@ git clone https://github.com/hazmr/omarum.git && cd omarum
 scripts/install.sh                # add --with-zonos3 to build the ZONOS3-Mini voice too
 ```
 
-The installer is safe to run again. It puts `omarum` on your PATH, downloads the models it needs, binds Ctrl+Shift+Space, and starts two user services at login (`omarum` and `omarum-orb`, restarted after a crash). It also adds an app-launcher entry, an **Omarum** submenu in the Omarchy menu, and an orb button in the bar (left-click: hands-free on/off, right-click: settings).
+The installer is safe to run again. It puts `omarum` on your PATH, downloads the models it needs, binds Ctrl+Shift+Space, and starts two user services at login (`omarum` and `omarum-orb`, restarted after a crash). It also adds an app-launcher entry, an **Omarum** submenu in the Omarchy menu, and Rum's orb in the bar (click: a panel with hands-free, the engine, your last conversation and settings; right-click: hands-free on/off; middle-click: settings).
 
 `scripts/uninstall.sh` removes exactly what the installer added. Your conversations, memory, models and settings stay unless you pass `--purge`.
 

@@ -442,3 +442,14 @@ async def test_tap_during_start_is_single_session():
     d = make(f)
     await asyncio.gather(d.handle({"cmd": "tap"}), d.handle({"cmd": "tap"}))
     assert f.starts == 1
+
+
+def test_cli_summary_prints_one_json_line(monkeypatch, capsys):
+    import json
+
+    from omarum import cli, summary
+
+    monkeypatch.setattr(summary, "current", lambda: {"name": "Rum", "talks": 0})
+    cli.main(["summary"])
+    out = capsys.readouterr().out
+    assert out.count("\n") == 1 and json.loads(out) == {"name": "Rum", "talks": 0}
