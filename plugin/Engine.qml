@@ -59,10 +59,12 @@ Item {
   }
 
   // 2. Setup: the environment, models, and tidying up an old install. Quick when all is there.
+  // --reinstall-package: the engine must run *this* folder's code (the plugin may have moved
+  // from a linked checkout to a clone, or been updated), not wherever it was first installed.
   Process {
     id: setup
     environment: engine.env
-    command: ["sh", "-c", "uv sync --project \"$1\" --quiet --no-dev && exec \"$2\" -m omarum.setup", "omarum-setup", engine.dir, engine.python]
+    command: ["sh", "-c", "uv sync --project \"$1\" --quiet --no-dev --reinstall-package omarum && exec \"$2\" -m omarum.setup", "omarum-setup", engine.dir, engine.python]
     stdout: SplitParser {
       onRead: data => {
         try {
