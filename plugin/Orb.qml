@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Wayland
 import qs.Commons
+import qs.Commons as Commons
 
 // Rum's orb, drawn by the plugin (ported from the old GTK orb: orb/omarum_orb.py,
 // omarum/orbshapes.py, omarum/orbstate.py). It exists only while it shows: when it
@@ -29,7 +30,7 @@ Scope {
   property real companionAt: -10
   property real errorSince: 0
   property real t: 0
-  property color color: colors.idle
+  property color color: restColor
 
   readonly property bool shown: alpha > 0.001
 
@@ -38,11 +39,14 @@ Scope {
     if ((s === "listening" || s === "user_speaking") && userLevel >= voiceThreshold) return "user_speaking"
     return s
   }
+  // Listening / thinking: Rum's color, softened toward the theme's text color so it reads
+  // as calm but stays clearly visible (the theme's "muted" color is nearly black on dark themes).
+  readonly property color restColor: mix(Qt.color(colors.companion), Commons.Color.foreground, 0.35)
   function targetColor(s) {
     if (s === "user_speaking") return colors.user
     if (s === "speaking") return colors.companion
     if (s === "error") return colors.error
-    return colors.idle
+    return restColor
   }
   function speakingEnergy(t) {
     var syl = Math.abs(Math.sin(t * 7.3)) * Math.abs(Math.sin(t * 2.1))
