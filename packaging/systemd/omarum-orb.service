@@ -1,0 +1,17 @@
+[Unit]
+Description=Omarum orb overlay
+Documentation=file://@REPO@/README.md
+After=graphical-session.target omarum.service
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+# gtk4-layer-shell must load before GTK, or the orb opens as a normal tiled window.
+Environment=LD_PRELOAD=/usr/lib/libgtk4-layer-shell.so
+ExecStart=/usr/bin/python3 @REPO@/orb/omarum_orb.py
+Restart=on-failure
+RestartSec=2
+UMask=0077
+
+[Install]
+WantedBy=graphical-session.target

@@ -18,17 +18,20 @@ A voice companion for [Omarchy](https://omarchy.org). Press a shortcut, a small 
   3. **Kokoro** (local, always available)
 - Noise doesn't interrupt Rum, the mic is muted while Rum speaks (until echo cancellation lands), and the service restarts itself after a crash.
 
-## Try it (prototype)
+## Install
 
 Requirements: Omarchy (Hyprland, PipeWire), [uv](https://docs.astral.sh/uv/), the `claude` CLI logged in, and the system packages `gtk4-layer-shell`, `python-gobject` and `portaudio`.
 
 ```bash
 git clone https://github.com/hazmr/omarum.git && cd omarum
-uv sync
-bash scripts/spike-install.sh   # puts `omarum` on PATH, binds Ctrl+Shift+Space, starts the daemon and the orb
+scripts/install.sh                # add --with-zonos3 to build the ZONOS3-Mini voice too
 ```
 
-Models download into `~/.local/share/omarum/` (Whisper, Kokoro). ZONOS3-Mini is optional and built from [Zyphra/ZONOS3-Mini](https://github.com/Zyphra/ZONOS3-Mini) into `~/.local/share/omarum/engines/zonos3`.
+The installer is safe to run again. It puts `omarum` on your PATH, downloads the models it needs, binds Ctrl+Shift+Space, and starts two user services at login (`omarum` and `omarum-orb`, restarted after a crash). It also adds an app-launcher entry, an **Omarum** submenu in the Omarchy menu, and an orb button in the bar (left-click: hands-free on/off, right-click: settings).
+
+`scripts/uninstall.sh` removes exactly what the installer added. Your conversations, memory, models and settings stay unless you pass `--purge`.
+
+Models download into `~/.local/share/omarum/` (Whisper, Kokoro). ZONOS3-Mini is optional and built from [Zyphra/ZONOS3-Mini](https://github.com/Zyphra/ZONOS3-Mini) into `~/.local/share/omarum/engines/zonos3`. Logs: `journalctl --user -u omarum -u omarum-orb`.
 
 Settings live in `~/.config/omarum/config.toml`, for example:
 
