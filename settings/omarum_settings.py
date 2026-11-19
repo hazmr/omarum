@@ -415,9 +415,9 @@ class Settings(Gtk.ApplicationWindow):
         self.eleven_status = "checking…"
 
         def work() -> None:
-            voices, pick = self.eleven_voices, voice
+            voices, pick, note = self.eleven_voices, voice, ""
             try:
-                voices = elevenlabs.list_voices(key)
+                voices, note = elevenlabs.voices_for(key)  # default voices if the key can't list its own
                 elevenlabs.save_cache(voices)
                 if voices and voice not in {v[0] for v in voices}:
                     pick = voices[0][0]  # a default voice the account can use
@@ -426,7 +426,8 @@ class Settings(Gtk.ApplicationWindow):
                 GLib.idle_add(sm.once(lambda: self._eleven_done(voices, voice, False, why)))
                 return
             why = elevenlabs.check(key, pick, model)
-            GLib.idle_add(sm.once(lambda: self._eleven_done(voices, pick, why is None, why or "✓ works")))
+            status = why or ("✓ works · " + note if note else "✓ works")
+            GLib.idle_add(sm.once(lambda: self._eleven_done(voices, pick, why is None, status)))
 
         threading.Thread(target=work, daemon=True).start()
 

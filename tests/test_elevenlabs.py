@@ -62,3 +62,12 @@ def test_key_id_pasted_instead_of_the_key_is_explained():
     why = elevenlabs.check("sk_k", "v", "m", urlopen=_resp(400, body))
     assert "ID" in why and "sk_" in why
     assert "sk_" in elevenlabs.check("0" * 64, "v", "m")  # caught before even asking ElevenLabs
+
+
+def test_without_voices_read_the_default_voices_are_offered():
+    err = _detail("missing_permissions", "The API key you used is missing the permission voices_read to execute this operation.")
+    voices, note = elevenlabs.voices_for("sk_k", urlopen=_resp(401, err))
+    assert ("EXAVITQu4vr4xnSDxMaL", "Sarah", "premade") in voices and len(voices) == len(elevenlabs.DEFAULT_VOICES)
+    assert "Voices: Read" in note
+    own = {"voices": [{"voice_id": "p1", "name": "Mine", "category": "cloned"}]}
+    assert elevenlabs.voices_for("sk_k", urlopen=_resp(200, own)) == ([("p1", "Mine", "cloned")], "")

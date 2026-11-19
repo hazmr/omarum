@@ -92,3 +92,25 @@ def load_cache(path: Path = CACHE) -> list[tuple[str, str, str]]:
         return [tuple(v) for v in json.loads(path.read_text())]
     except (OSError, ValueError):
         return []
+
+
+# ElevenLabs' default voices that a free plan can use over the API (checked 2026-11-19;
+# "Charlotte" needs a paid plan). Offered when the key may speak but not list voices.
+DEFAULT_VOICES = [(vid, name, "premade") for vid, name in [
+    ("EXAVITQu4vr4xnSDxMaL", "Sarah"), ("FGY2WhTYpPnrIDTdsKH5", "Laura"), ("IKne3meq5aSn9XLyUdCD", "Charlie"),
+    ("JBFqnCBsd6RMkjVDRZzb", "George"), ("N2lVS1w4EtoT3dr4eOWO", "Callum"), ("SAz9YHcvj6GT2YYXdXww", "River"),
+    ("TX3LPaxmHKxFdv7VOQHJ", "Liam"), ("Xb7hH8MSUJpSbSDYk0k2", "Alice"), ("XrExE9yKIg1WjnnlVkGX", "Matilda"),
+    ("bIHbv24MWmeRgasZH58o", "Will"), ("cgSgspJ2msm6clMCkdW9", "Jessica"), ("cjVigY5qzO86Huf0OWal", "Eric"),
+    ("iP95p4xoKVk53GoZ742B", "Chris"), ("nPczCjzI2devNBz1zQrb", "Brian"), ("onwK4e9ZLuTAKqWW03F9", "Daniel"),
+    ("pFZP5JQG7iQjIQuC4Bku", "Lily"), ("pqHfZKP75CvOlQylNhV4", "Bill"),
+]]
+
+
+def voices_for(key: str, urlopen=None) -> tuple[list[tuple[str, str, str]], str]:
+    """(voices to offer, a note). A key without 'Voices: Read' still gets the default voices."""
+    try:
+        return list_voices(key, urlopen=urlopen), ""
+    except ElevenLabsError as e:
+        if "Voices: Read" not in str(e):
+            raise
+        return list(DEFAULT_VOICES), "default voices (turn on 'Voices: Read' for the key to also see your own)"
