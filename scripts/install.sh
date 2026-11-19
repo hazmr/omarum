@@ -22,10 +22,16 @@ state="$HOME/.local/state/omarum"
 models="$data/models"
 units="$config/systemd/user"
 say() { printf '\033[1m==>\033[0m %s\n' "$*"; }
-integ() { uv run --project "$repo" --quiet python -m omarum.integration "$@"; }
+# Helpers run on the omarum tool's own Python, so a read-only (packaged) copy of the repo works too.
+tool_python() { echo "$(uv tool dir)/omarum/bin/python"; }
+integ() { "$(tool_python)" -m omarum.integration "$@"; }
 
 say "Installing the omarum command"
-uv tool install --quiet --force --editable "$repo"
+if [ -w "$repo" ]; then
+  uv tool install --quiet --force --editable "$repo"   # a git checkout: edits take effect at once
+else
+  uv tool install --quiet --force "$repo"              # a packaged copy (/usr/share/omarum)
+fi
 omarum_bin="$(command -v omarum || echo "$HOME/.local/bin/omarum")"
 mkdir -p "$state"
 chmod 700 "$state"
@@ -34,7 +40,7 @@ say "Models (skipped when already downloaded)"
 whisper() {  # $1 = faster-whisper model name
   if [ -f "$models/whisper/$1/model.bin" ]; then echo "    whisper $1: present"; return; fi
   echo "    whisper $1: downloading"
-  uv run --project "$repo" --quiet python -c \
+  "$(tool_python)" -c \
     "import sys; from faster_whisper import download_model; download_model(sys.argv[1], output_dir=sys.argv[2])" \
     "$1" "$models/whisper/$1"
 }

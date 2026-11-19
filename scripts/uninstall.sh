@@ -19,7 +19,8 @@ config="${XDG_CONFIG_HOME:-$HOME/.config}"
 share="${XDG_DATA_HOME:-$HOME/.local/share}"
 units="$config/systemd/user"
 say() { printf '\033[1m==>\033[0m %s\n' "$*"; }
-integ() { uv run --project "$repo" --quiet python -m omarum.integration "$@"; }
+# Runs before the omarum tool is removed (last step); stdlib only, so the system Python works too.
+integ() { PYTHONPATH="$repo" python3 -m omarum.integration "$@"; }
 
 say "Services"
 systemctl --user disable --now omarum-orb.service omarum.service 2>/dev/null || true

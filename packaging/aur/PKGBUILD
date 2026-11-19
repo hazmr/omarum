@@ -1,0 +1,55 @@
+# Maintainer: hazmr
+pkgname=omarum-git
+_pkgname=omarum
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Rum, a voice-only AI companion for Omarchy: an orb, your voice and theirs, and a memory of you"
+arch=('any')
+url="https://github.com/hazmr/omarum"
+license=('MIT')
+depends=('python' 'gtk4' 'gtk4-layer-shell' 'python-gobject' 'python-cairo' 'portaudio' 'ffmpeg' 'mpv' 'uv')
+makedepends=('git')
+optdepends=(
+  'vulkan-icd-loader: ZONOS3-Mini voice on the GPU'
+  'claude-code: Claude as the brain'
+)
+provides=("$_pkgname")
+conflicts=("$_pkgname")
+install=omarum.install
+source=("$_pkgname::git+https://github.com/hazmr/omarum.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$_pkgname"
+  printf "0.1.0.r%s.g%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+package() {
+  cd "$_pkgname"
+  local dest="$pkgdir/usr/share/$_pkgname"
+  install -d "$dest"
+  cp -a --no-preserve=ownership bar bin omarum orb settings scripts packaging pyproject.toml uv.lock README.md LICENSE "$dest/"
+  find "$dest" -name '__pycache__' -prune -exec rm -rf {} +
+
+  # Per-user setup: the services, shortcuts, menu and bar button live in each user's config.
+  install -Dm755 /dev/stdin "$pkgdir/usr/bin/omarum-setup" <<'SH'
+#!/bin/sh
+exec /usr/share/omarum/scripts/install.sh "$@"
+SH
+  install -Dm755 /dev/stdin "$pkgdir/usr/bin/omarum-uninstall" <<'SH'
+#!/bin/sh
+exec /usr/share/omarum/scripts/uninstall.sh "$@"
+SH
+  # `omarum` itself is the user's uv tool (~/.local/bin/omarum), created by omarum-setup.
+  install -Dm755 /dev/stdin "$pkgdir/usr/bin/omarum" <<'SH'
+#!/bin/sh
+for bin in "$HOME/.local/bin/omarum" "$(uv tool dir 2>/dev/null)/omarum/bin/omarum"; do
+  [ -x "$bin" ] && exec "$bin" "$@"
+done
+echo "omarum is not set up for $USER yet. Run: omarum-setup" >&2
+exit 1
+SH
+
+  install -Dm644 packaging/omarum.desktop "$pkgdir/usr/share/applications/omarum.desktop"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
