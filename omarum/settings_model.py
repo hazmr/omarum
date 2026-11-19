@@ -133,3 +133,21 @@ def step(r: Row, value, direction: int):
         new = max(lo, min(hi, value + direction * inc))
         return float(new) if isinstance(value, float) else int(new)
     return value
+
+
+def once(fn):
+    """For GLib.idle_add: run fn one time. (GLib repeats a callback that returns True, and
+    grab_focus() returns True, so idle_add(entry.grab_focus) would grab focus forever.)"""
+    def run(*_args):
+        fn()
+        return False
+    return run
+
+
+EDIT_KEYS = {"Escape": ("cancel", 0), "Down": ("save", +1), "Up": ("save", -1),
+             "Tab": ("save", +1), "ISO_Left_Tab": ("save", -1)}
+
+
+def edit_key(name: str):
+    """What a key does while a text field is open: (action, move) or None (the field keeps it)."""
+    return EDIT_KEYS.get(name)

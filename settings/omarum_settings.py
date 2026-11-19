@@ -77,6 +77,7 @@ class Settings(Gtk.ApplicationWindow):
         self.index = 0
         self.items: list[Item] = []
         self.editing: Gtk.Entry | None = None
+        self.editing_row: sm.Row | None = None
         self.armed: str | None = None  # "forget:3" / "delete:<dir>" waiting for a second d
         self.player: subprocess.Popen | None = None
         self.message = ""
@@ -105,6 +106,9 @@ class Settings(Gtk.ApplicationWindow):
         self.set_child(root)
 
         keys = Gtk.EventControllerKey()
+        # Capture: see keys before a text field does (Esc/↑/↓/Tab while editing); anything
+        # the handler doesn't take still reaches the field.
+        keys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
         keys.connect("key-pressed", self.on_key)
         self.add_controller(keys)
         self.connect("close-request", lambda *_: self.stop_playback() or False)
@@ -347,9 +351,9 @@ class Settings(Gtk.ApplicationWindow):
         else:
             entry.set_text(str(self.values.get(r.key, "")))
         entry.connect("activate", lambda e: self.finish_edit(r, e.get_text()))
-        self.editing = entry
+        self.editing, self.editing_row = entry, r
         self.render()
-        GLib.idle_add(entry.grab_focus)
+        GLib.idle_add(sm.once(entry.grab_focus))
 
     def finish_edit(self, r: sm.Row, text: str) -> None:
         self.editing = None
@@ -464,6 +468,10 @@ class Settings(Gtk.ApplicationWindow):
         self.render()
 
     def click(self, i: int) -> None:
+        if self.editing is not None:  # clicking elsewhere saves what was typed
+            if i == self.index:
+                return  # a click inside the open field (placing the cursor)
+            self.finish_edit(self.editing_row, self.editing.get_text())
         self.index = i
         self.render()
         self.activate()
@@ -473,11 +481,17 @@ class Settings(Gtk.ApplicationWindow):
             self.capture(keyval, state)
             return True
         if self.editing is not None:
-            if keyval == Gdk.KEY_Escape:
+            what = sm.edit_key(Gdk.keyval_name(keyval) or "")
+            if what is None:
+                return False  # typing and cursor keys stay in the field
+            action, move = what
+            if action == "cancel":
                 self.editing = None
                 self.render()
-                return True
-            return False  # typing goes to the entry
+            else:  # save, then go to the next/previous row like a form
+                self.finish_edit(self.editing_row, self.editing.get_text())
+                self.move(move)
+            return True
         shift = bool(state & Gdk.ModifierType.SHIFT_MASK)
         k = keyval
         if k in (Gdk.KEY_q, Gdk.KEY_Escape):

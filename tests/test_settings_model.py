@@ -108,3 +108,24 @@ def test_brain_and_model_display_and_step():
     assert step(rows["Model"], "", +1) == "gpt-5"
     assert step(rows["Model"], "my-own", +1) == ""  # unknown → back to the first suggestion
     assert step(rows["Brain"], "codex", +1) == "gemini-cli"
+
+
+def test_once_never_asks_glib_to_repeat():
+    """GLib repeats an idle callback while it returns True; grab_focus() returns True, so
+    idle_add(entry.grab_focus) re-selected the whole field forever (each key replaced the text)."""
+    from omarum.settings_model import once
+
+    calls = []
+    cb = once(lambda: calls.append(1) or True)
+    assert cb() is False and calls == [1]
+
+
+def test_keys_while_editing_act_like_a_form():
+    from omarum.settings_model import edit_key
+
+    assert edit_key("Escape") == ("cancel", 0)
+    assert edit_key("Down") == ("save", +1)
+    assert edit_key("Up") == ("save", -1)
+    assert edit_key("Tab") == ("save", +1)
+    assert edit_key("ISO_Left_Tab") == ("save", -1)
+    assert edit_key("a") is None and edit_key("Left") is None  # typing and moving the cursor stay in the field
