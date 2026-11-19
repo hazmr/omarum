@@ -58,7 +58,7 @@ def test_shortcut_rows_and_display():
     r = row("talk_shortcut")
     assert r.kind == "shortcut" and r.tab == "Companion"
     assert display(r, "CTRL + SHIFT + SPACE") == "Ctrl + Shift + Space"
-    assert display(row("settings_shortcut"), "") == "none"
+    assert display(r, "") == "none"
     assert step(r, "CTRL + SHIFT + SPACE", +1) == "CTRL + SHIFT + SPACE"  # changed only by recording
 
 

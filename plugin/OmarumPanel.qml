@@ -87,6 +87,7 @@ Panel {
   }
   Engine { id: engine }
   Orb { engine: engine }
+  TalkShortcut { engine: engine }
 
   ShellIpc {
     target: root.ipcTarget

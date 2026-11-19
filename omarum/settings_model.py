@@ -48,7 +48,6 @@ ROWS: list[Row] = [
         hint="stops your companion hearing itself through the speakers"),
     Row("Companion", "Shortcuts", "Talk (hold) / hands-free (tap)", "talk_shortcut", "shortcut",
         hint="Enter, then press the new keys"),
-    Row("Companion", "Shortcuts", "Open settings", "settings_shortcut", "shortcut", hint="optional"),
     # Engine
     Row("Engine", "Voice", "Engine", "voice_primary", "seg", ("elevenlabs", "zonos3", "kokoro"),
         hint="falls back down this order if it fails"),

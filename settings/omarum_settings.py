@@ -25,7 +25,7 @@ from omarum.config import load_config  # noqa: E402
 from omarum.configio import has_secret, save_config, set_secret  # noqa: E402
 from omarum.ipc import DaemonNotRunning, send_command  # noqa: E402
 from omarum.models import MODELS_DIR  # noqa: E402
-from omarum.shortcuts import apply as apply_shortcuts, conflicts, current_binds, normalize  # noqa: E402
+from omarum.shortcuts import conflicts, current_binds, normalize  # noqa: E402
 from omarum.store import Store  # noqa: E402
 from omarum.theme import ui_colors  # noqa: E402
 from omarum.zonos3_tts import is_installed as zonos3_installed  # noqa: E402
@@ -381,12 +381,7 @@ class Settings(Gtk.ApplicationWindow):
             key = Gdk.keyval_name(Gdk.keyval_to_lower(keyval)) or name
             combo = normalize("+".join(mods + [key]))
         self.values[r.key] = combo
-        save_config({r.key: combo})
-        try:
-            apply_shortcuts(load_config(), shutil.which("omarum") or "omarum")
-        except OSError as exc:
-            self.flash(f"Saved, but Hyprland didn't reload: {exc}")
-            return
+        save_config({r.key: combo})  # the plugin sees the change and binds the new keys itself
         clash = conflicts(combo, current_binds())
         self.message = ""
         self.flash(f"Saved. Also used by: {', '.join(clash)}" if clash else ("Saved" if combo else "Shortcut removed"))
