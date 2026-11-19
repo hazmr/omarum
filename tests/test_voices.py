@@ -70,3 +70,32 @@ def test_pick_speaker_by_name():
     assert pick_speaker(speakers, "default_aa") == "default_aa"
     assert pick_speaker(speakers, "Nobody") == "default_aa"  # unknown name -> first voice
     assert pick_speaker([], "Savannah") is None
+
+
+def test_leading_silence_is_trimmed_across_chunks():
+    import struct
+
+    from omarum.zonos3_tts import LeadingSilenceTrimmer
+
+    silence = struct.pack("<100h", *([3] * 100))
+    voice = struct.pack("<4h", 9000, -9000, 9000, -9000)
+    t = LeadingSilenceTrimmer(threshold=500, max_trim_samples=1000)
+    assert t.feed(silence) == b""          # quiet start dropped
+    assert t.feed(silence + voice) == voice  # keeps from the first loud sample
+    assert t.feed(silence) == silence      # silence inside speech is kept
+
+
+def test_trim_gives_up_after_max():
+    import struct
+
+    from omarum.zonos3_tts import LeadingSilenceTrimmer
+
+    quiet = struct.pack("<50h", *([1] * 50))
+    t = LeadingSilenceTrimmer(threshold=500, max_trim_samples=60)
+    assert t.feed(quiet) == b""
+    assert len(t.feed(quiet)) == 40 * 2  # only 60 samples may be dropped in total
+
+
+def test_faster_turn_taking_defaults():
+    assert Config().vad_stop_secs == 0.3
+    assert Config().whisper_ttfs_p99 == 0.05

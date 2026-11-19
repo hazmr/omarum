@@ -22,6 +22,28 @@ def float32_to_int16(buf: bytes) -> bytes:
     return out.tobytes()
 
 
+class LeadingSilenceTrimmer:
+    """Drops the quiet lead-in ZONOS3 puts before each sentence (int16 PCM, streamed)."""
+
+    def __init__(self, threshold: int = 300, max_trim_samples: int = 7200) -> None:
+        self.threshold = threshold
+        self.budget = max_trim_samples  # never drop more than this (0.3 s at 24 kHz)
+        self.started = False
+
+    def feed(self, pcm: bytes) -> bytes:
+        if self.started:
+            return pcm
+        samples = array.array("h", pcm)
+        for i, v in enumerate(samples):
+            if abs(v) >= self.threshold or i >= self.budget:
+                self.started = True
+                return samples[i:].tobytes()
+        self.budget -= len(samples)
+        if self.budget <= 0:
+            self.started = True
+        return b""
+
+
 def pick_speaker(speakers: list[dict], wanted: str) -> str | None:
     """A speaker id from GET /v2/speakers: by exact id, else by name (case-insensitive), else the first."""
     if not speakers:
@@ -98,6 +120,7 @@ def make_service(base_url: str, voice: str, language: str):
 
             self._session = self._session or aiohttp.ClientSession()
             resampler = create_stream_resampler()
+            trimmer = LeadingSilenceTrimmer(max_trim_samples=int(self.sample_rate * 0.3))
             leftover = b""
             try:
                 body = {"text": text, "language": language, "stream": True}
@@ -113,7 +136,9 @@ def make_service(base_url: str, voice: str, language: str):
                         data = leftover + chunk
                         cut = len(data) // 4 * 4
                         leftover = data[cut:]
-                        pcm = await resampler.resample(float32_to_int16(data[:cut]), SERVER_RATE, self.sample_rate)
+                        pcm = trimmer.feed(
+                            await resampler.resample(float32_to_int16(data[:cut]), SERVER_RATE, self.sample_rate)
+                        )
                         if pcm:
                             yield TTSAudioRawFrame(audio=pcm, sample_rate=self.sample_rate, num_channels=1, context_id=context_id)
             except Exception as exc:  # server down, crashed, bad voice...

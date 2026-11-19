@@ -30,13 +30,14 @@ class Config:
     zonos3_language: str = "en_us"
     kokoro_voice: str = "af_heart"
     piper_voice: str = "en_US-amy-medium"
-    vad_stop_secs: float = 0.6
+    vad_stop_secs: float = 0.3  # smart-turn model decides if the sentence is finished
     vad_confidence: float = 0.8
     vad_start_secs: float = 0.3
     vad_min_volume: float = 0.7
     interrupt_min_words: int = 3
     mute_while_speaking: bool = True  # stops Rum hearing itself without echo cancellation
     whisper_no_speech_prob: float = 0.3
+    whisper_ttfs_p99: float = 0.05  # turn already starts from a transcript; skip the STT safety wait
     idle_timeout_secs: float = 8.0
     orb_position: str = "top-right"
 

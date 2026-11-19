@@ -42,6 +42,7 @@ def build_pipeline(cfg: Config, emit: Emit) -> tuple[PipelineTask, Callable[[], 
         ),
         device=device,
         compute_type=compute,
+        ttfs_p99_latency=cfg.whisper_ttfs_p99,
     )
     llm = ClaudeCodeLLMService(
         model=cfg.brain_model,
