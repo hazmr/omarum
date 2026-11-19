@@ -27,8 +27,7 @@ from pipecat.services.settings import LLMSettings
 from omarum.paths import DATA_DIR  # noqa: E402  (re-exported for older imports)
 
 
-class BrainUnavailable(Exception):
-    pass
+from omarum.brains import BrainUnavailable  # noqa: E402,F401  (one exception for every brain)
 
 
 def claude_command(model: str, system_prompt: str) -> list[str]:

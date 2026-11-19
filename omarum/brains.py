@@ -65,6 +65,10 @@ PROVIDERS: dict[str, Provider] = {p.id: p for p in [
     Provider("custom", "Custom (OpenAI-compatible)", "openai", "Local", "", (), env_key="OMARUM_CUSTOM_API_KEY"),
 ]}
 
+class BrainUnavailable(Exception):
+    """The chosen brain can't answer; the message is shown to the user as the reason."""
+
+
 DEFAULT = "claude-code"
 CLAUDE_SUBSCRIPTION_MODELS = ("haiku", "sonnet", "opus")
 
@@ -92,3 +96,66 @@ def status(p: Provider, env: dict, which=shutil.which, url: str = "") -> str:
 def label(cfg) -> str:
     p, model = resolve(cfg)
     return f"{p.label} · {model}" if model else p.label
+
+
+def not_ready_reason(cfg, env: dict, which=shutil.which) -> str | None:
+    p, model = resolve(cfg)
+    state = status(p, env, which, cfg.brain_url)
+    if state == "not installed":
+        return f"{p.label} is not installed ({p.binary} not found)"
+    if state == "needs key":
+        return f"{p.label} needs an API key: add {p.env_key} in Omarum settings (Engine)"
+    if state == "needs endpoint":
+        return "The custom brain needs an endpoint URL in Omarum settings (Engine)"
+    if p.kind != "cli" and not model:
+        return f"{p.label} needs a model name in Omarum settings (Engine)"
+    return None
+
+
+def _default_factories() -> dict:
+    """Pipecat services, imported only when a session starts (they're heavy)."""
+    def claude_code(**kw):
+        from omarum.claude_code_llm import ClaudeCodeLLMService
+        return ClaudeCodeLLMService(**kw)
+
+    def cli(**kw):
+        from omarum.cli_llm import CliLLMService
+        return CliLLMService(**kw)
+
+    def anthropic(**kw):
+        from pipecat.services.anthropic.llm import AnthropicLLMService
+        return AnthropicLLMService(settings=AnthropicLLMService.Settings(model=kw.pop("model")), **kw)
+
+    def openai(**kw):
+        from pipecat.services.openai.llm import OpenAILLMService
+        return OpenAILLMService(settings=OpenAILLMService.Settings(model=kw.pop("model")), **kw)
+
+    def gemini(**kw):
+        from pipecat.services.google.llm import GoogleLLMService
+        return GoogleLLMService(settings=GoogleLLMService.Settings(model=kw.pop("model")), **kw)
+
+    return {"claude-code": claude_code, "cli": cli, "anthropic": anthropic, "openai": openai, "gemini": gemini}
+
+
+def make_llm(cfg, env: dict, system_prompt: str, on_error=None, factories: dict | None = None, which=shutil.which):
+    """The Pipecat service for the configured brain; BrainUnavailable(reason) if it isn't ready.
+
+    API brains also find the persona as the context's first system message (see pipeline).
+    """
+    reason = not_ready_reason(cfg, env, which)
+    if reason:
+        raise BrainUnavailable(reason)
+    f = factories or _default_factories()
+    p, model = resolve(cfg)
+    if p.id == "claude-code":
+        return f["claude-code"](model=model, system_prompt=system_prompt, on_error=on_error)
+    if p.kind == "cli":
+        return f["cli"](provider_id=p.id, model=model, system_prompt=system_prompt,
+                        user=cfg.user_name, companion=cfg.companion_name, on_error=on_error)
+    if p.kind == "anthropic":
+        return f["anthropic"](api_key=env[p.env_key], model=model)
+    if p.kind == "gemini":
+        return f["gemini"](api_key=env[p.env_key], model=model)
+    base_url = cfg.brain_url.strip() if p.id == "custom" else p.base_url
+    key = env.get(p.env_key, "") if p.env_key else ""
+    return f["openai"](api_key=key or "ollama", model=model, base_url=base_url)

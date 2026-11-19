@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import shutil
 import time
 from typing import Awaitable, Callable
 
 from loguru import logger
 
+from omarum import brains
 from omarum.config import Config
+from omarum.voices import load_env_file
 from omarum.memory import update_profile, write_journal
 from omarum.recorder import read_transcript
 from omarum.store import Store
@@ -202,8 +205,9 @@ class Daemon:
     async def _start(self) -> dict:
         if self._starting or self._active:
             return self._reply()
-        if shutil.which("claude") is None:
-            self._set_state("error", "claude CLI not found")
+        reason = brains.not_ready_reason(self.cfg, {**load_env_file(), **os.environ}, shutil.which)
+        if reason:  # CLI missing, key missing, ...: say why instead of failing mid-start
+            self._set_state("error", reason)
             return self._reply(ok=False)
         self._starting = True
         try:

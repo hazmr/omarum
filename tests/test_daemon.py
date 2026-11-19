@@ -463,3 +463,20 @@ async def test_finished_session_releases_its_pipeline():
     assert d._stop is not None
     await d.handle({"cmd": "toggle"})
     assert d._stop is None
+
+
+async def test_any_brain_starts_without_the_claude_cli(monkeypatch):
+    monkeypatch.setattr("omarum.daemon.shutil.which", lambda name: "/usr/bin/codex" if name == "codex" else None)
+    f = FakeFactory()
+    d = make(f, brain="codex")
+    r = await d.handle({"cmd": "toggle"})
+    assert r["ok"] and f.starts == 1
+
+
+async def test_brain_without_key_errors_with_reason(monkeypatch):
+    monkeypatch.setattr("omarum.daemon.load_env_file", lambda: {})
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    f = FakeFactory()
+    d = make(f, brain="gemini")
+    r = await d.handle({"cmd": "toggle"})
+    assert r["ok"] is False and "GEMINI_API_KEY" in r["reason"] and f.starts == 0

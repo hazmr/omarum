@@ -1,4 +1,4 @@
-"""The voice loop: mic -> VAD -> Whisper -> Claude Code -> Piper -> speakers."""
+"""The voice loop: mic -> VAD -> Whisper -> any brain -> voice -> speakers."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from pipecat.transports.local.audio import LocalAudioTransport, LocalAudioTransp
 
 from omarum.context import build_system_prompt
 from omarum.store import Store
-from omarum.claude_code_llm import ClaudeCodeLLMService
+from omarum import brains
 from omarum.config import Config
 from omarum.levels import LatencyClock, StateTap
 from omarum.micgate import Breaker, MicGate
@@ -55,12 +55,12 @@ def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, C
         )
 
     stt = make_stt(cfg, whisper)
-    llm = ClaudeCodeLLMService(
-        model=cfg.brain_model,
-        system_prompt=build_system_prompt(cfg, store, datetime.now()),
+    env = {**load_env_file(), **os.environ}
+    system_prompt = build_system_prompt(cfg, store, datetime.now())
+    llm = brains.make_llm(
+        cfg, env, system_prompt,
         on_error=lambda reason: emit({"type": "state", "state": "error", "reason": reason}),
     )
-    env = {**load_env_file(), **os.environ}
     tts = build_tts(cfg, env)
     recorder = AudioBufferProcessor(num_channels=1, auto_start_recording=True)
 
@@ -68,8 +68,10 @@ def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, C
     async def _keep_audio(_proc, user_audio, bot_audio, sample_rate, _channels):
         session.add_audio(user_audio, bot_audio, sample_rate)
 
-    session.meta = {"brain_model": cfg.brain_model, "voices": voice_chain(cfg, available_voices(env)), "latency_ms": clock.samples}
-    context = LLMContext()
+    session.meta = {"brain": brains.label(cfg), "voices": voice_chain(cfg, available_voices(env)), "latency_ms": clock.samples}
+    # The persona travels with the conversation, so API brains get it too; the CLI brains
+    # skip system messages (they get the persona their own way).
+    context = LLMContext(messages=[{"role": "system", "content": system_prompt}])
     aggregators = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(

@@ -61,3 +61,54 @@ def test_config_brain_defaults_and_unknown_provider(tmp_path: Path):
     assert cfg.brain_model == "my-own-model"     # any model name is allowed now
     f.write_text('brain = "groq"\n')
     assert load_config(f).brain == "groq"
+
+
+class Recorder:
+    def __init__(self):
+        self.calls = []
+
+    def factory(self, name):
+        def make(**kw):
+            self.calls.append((name, kw))
+            return name
+        return make
+
+
+def _make(cfg, env, rec, which=lambda b: "/usr/bin/" + b):
+    factories = {k: rec.factory(k) for k in ("claude-code", "cli", "anthropic", "openai", "gemini")}
+    return brains.make_llm(cfg, env, "You are Rum.", on_error=None, factories=factories, which=which)
+
+
+def test_make_llm_picks_service_per_kind():
+    rec = Recorder()
+    assert _make(Config(brain="claude-code", brain_model="sonnet"), {}, rec) == "claude-code"
+    assert rec.calls[-1][1]["model"] == "sonnet" and rec.calls[-1][1]["system_prompt"] == "You are Rum."
+    assert _make(Config(brain="codex", brain_model=""), {}, rec) == "cli"
+    assert rec.calls[-1][1]["provider_id"] == "codex"
+    assert _make(Config(brain="anthropic"), {"ANTHROPIC_API_KEY": "a"}, rec) == "anthropic"
+    assert rec.calls[-1][1] == {"api_key": "a", "model": "claude-haiku-5-5"}
+    assert _make(Config(brain="groq"), {"GROQ_API_KEY": "g"}, rec) == "openai"
+    assert rec.calls[-1][1]["base_url"] == "https://api.groq.com/openai/v1"
+    assert _make(Config(brain="ollama", brain_model="llama3.2"), {}, rec) == "openai"
+    assert rec.calls[-1][1]["api_key"] == "ollama"  # local: any non-empty key
+    assert _make(Config(brain="custom", brain_url="http://localhost:1234/v1", brain_model="m"), {}, rec) == "openai"
+    assert rec.calls[-1][1]["base_url"] == "http://localhost:1234/v1"
+    assert _make(Config(brain="gemini"), {"GEMINI_API_KEY": "k"}, rec) == "gemini"
+    assert rec.calls[-1][1] == {"api_key": "k", "model": "gemini-2.5-flash"}  # persona comes in the context
+
+
+def test_make_llm_not_ready_reasons():
+    import pytest
+
+    from omarum.claude_code_llm import BrainUnavailable
+
+    rec = Recorder()
+    with pytest.raises(BrainUnavailable, match="Gemini needs an API key"):
+        _make(Config(brain="gemini"), {}, rec)
+    with pytest.raises(BrainUnavailable, match="Codex is not installed"):
+        _make(Config(brain="codex"), {}, rec, which=lambda b: None)
+    with pytest.raises(BrainUnavailable, match="endpoint"):
+        _make(Config(brain="custom"), {}, rec)
+    with pytest.raises(BrainUnavailable, match="model"):
+        _make(Config(brain="custom", brain_url="http://x/v1", brain_model=""), {}, rec)
+    assert rec.calls == []

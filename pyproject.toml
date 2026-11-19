@@ -5,7 +5,7 @@ license = "MIT"
 description = "Omarum: a voice companion for Omarchy"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "pipecat-ai[kokoro,local,piper,silero,whisper]==1.16.0",
+    "pipecat-ai[anthropic,google,kokoro,local,openai,piper,silero,whisper]==1.16.0",
 ]
 
 [project.scripts]
