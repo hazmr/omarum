@@ -29,10 +29,11 @@ systemctl --user daemon-reload
 
 say "Bar button"
 omarchy plugin disable omarum.panel >/dev/null 2>&1 || true
-plugin="$config/omarchy/plugins/omarum"
-if [ -L "$plugin" ] && [ "$(readlink -f "$plugin")" = "$repo/bar/omarum" ]; then
-  rm "$plugin"
-fi
+for plugin in "$config/omarchy/plugins/omarum.panel" "$config/omarchy/plugins/omarum"; do
+  if [ -L "$plugin" ] && [ "$(readlink -f "$plugin")" = "$repo/bar/omarum" ]; then
+    rm "$plugin"
+  fi
+done
 omarchy-shell shell rescanPlugins >/dev/null 2>&1 || true
 
 say "Omarchy menu entries"

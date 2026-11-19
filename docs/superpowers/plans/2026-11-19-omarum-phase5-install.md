@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Plugin id `omarum.panel`, folder `~/.config/omarchy/plugins/omarum` → symlink to the repo's `bar/omarum` (as Superwhisper does). Enabled with `omarchy plugin enable omarum.panel`; passes `omarchy plugin validate`.
+- Plugin id `omarum.panel`, folder `~/.config/omarchy/plugins/omarum.panel` → symlink to the repo's `bar/omarum` (as Superwhisper does). Enabled with `omarchy plugin enable omarum.panel`; passes `omarchy plugin validate`.
 - Bar button: an orb glyph; theme foreground when closed, accent (`activeColor`) when Rum is open; **left-click = tap** (hands-free on/off), **right-click = settings**; tooltip shows the state.
 - Units live in `~/.config/systemd/user/`; `Restart=on-failure`, `RestartSec=2`, `UMask=0077`. The orb unit sets `Environment=LD_PRELOAD=/usr/lib/libgtk4-layer-shell.so`.
 - The installer is idempotent and never overwrites other people's hooks, menu entries or bindings. The uninstaller removes only what Omarum added (data in `~/.local/share/omarum` is kept unless `--purge`).

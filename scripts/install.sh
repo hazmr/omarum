@@ -125,8 +125,11 @@ say "Omarchy menu entries"
 integ menu-add "$config/omarchy/extensions/omarchy-menu.jsonc"
 
 say "Bar button"
-plugin="$config/omarchy/plugins/omarum"
+# Omarchy finds a plugin by its id, so the folder must be named exactly like it.
+plugin="$config/omarchy/plugins/omarum.panel"
 mkdir -p "$config/omarchy/plugins"
+old="$config/omarchy/plugins/omarum"   # where versions before 0.2 linked it
+if [ -L "$old" ] && [ "$(readlink -f "$old")" = "$repo/bar/omarum" ]; then rm "$old"; fi
 if [ -L "$plugin" ] && [ "$(readlink -f "$plugin")" = "$repo/bar/omarum" ]; then
   echo "    plugin link: present"
 elif [ -e "$plugin" ] || [ -L "$plugin" ]; then
