@@ -47,7 +47,7 @@ class Store:
     def new_conversation(self, now: datetime) -> Path:
         day = self.conversations_dir / now.strftime("%Y-%m-%d")
         while True:
-            d = day / f"{now.strftime('%H%M')}-{secrets.token_hex(3)}"
+            d = day / f"{now.strftime('%H%M%S')}-{secrets.token_hex(3)}"  # seconds keep same-minute talks in order
             try:
                 d.mkdir(parents=True)
                 return d

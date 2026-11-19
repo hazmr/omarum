@@ -25,7 +25,7 @@ def test_new_conversation_path(tmp_path: Path):
     a = s.new_conversation(datetime(2026, 11, 19, 21, 40))
     b = s.new_conversation(datetime(2026, 11, 19, 21, 40))
     assert a.parent.name == "2026-11-19"
-    assert a.name.startswith("2140-")
+    assert a.name.startswith("214000-")
     assert a != b and a.is_dir() and b.is_dir()
 
 
@@ -50,3 +50,11 @@ def test_prune_respects_retention(tmp_path: Path):
     assert s.prune(7, now) == 1
     assert not (s.conversations_dir / "2026-11-01").exists()
     assert (s.conversations_dir / "2026-11-18").exists()
+
+
+def test_same_minute_conversations_sort_in_time_order(tmp_path: Path):
+    s = Store(tmp_path)
+    s.ensure()
+    first = _conv(s, datetime(2026, 11, 19, 2, 54, 5))
+    second = _conv(s, datetime(2026, 11, 19, 2, 54, 40))
+    assert s.conversations_on(datetime(2026, 11, 19).date()) == [first, second]
