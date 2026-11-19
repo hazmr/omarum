@@ -6,7 +6,7 @@ A voice companion for [Omarchy](https://omarchy.org). Press a shortcut, a small 
 
 ## What works today
 
-- **Super + H** starts and stops a conversation. Rum also stops after 8 seconds of silence.
+- **Hold Ctrl + Shift + Space** to talk: Rum stops mid-sentence the moment you press (interrupt), listens while you hold, and answers when you let go. **Tap** it for hands-free mode, tap again to close. Rum also closes after 8 seconds of silence. Change the keys in `omarum settings` → Shortcuts.
 - **Memory:** every conversation is saved locally (both voices + transcript). Rum updates plain-text notes about you after each talk, writes a daily journal, and starts every conversation knowing them.
 - **Settings:** `omarum settings` opens a keyboard-first window (Companion · Engine · Memory · Conversations) to change everything below, forget facts, and play back or delete conversations.
 - **The orb** (GTK4 layer-shell overlay) follows the conversation: your color while you talk, Rum's while Rum talks. Three styles (glow, lines, ring), five positions (center dims the screen), any size, colors from your Omarchy theme (updates live when you switch themes) or Warm/Glass/Mono.
@@ -25,7 +25,7 @@ Requirements: Omarchy (Hyprland, PipeWire), [uv](https://docs.astral.sh/uv/), th
 ```bash
 git clone https://github.com/hazmr/omarum.git && cd omarum
 uv sync
-bash scripts/spike-install.sh   # puts `omarum` on PATH, binds Super+H, starts the daemon and the orb
+bash scripts/spike-install.sh   # puts `omarum` on PATH, binds Ctrl+Shift+Space, starts the daemon and the orb
 ```
 
 Models download into `~/.local/share/omarum/` (Whisper, Kokoro). ZONOS3-Mini is optional and built from [Zyphra/ZONOS3-Mini](https://github.com/Zyphra/ZONOS3-Mini) into `~/.local/share/omarum/engines/zonos3`.
