@@ -14,6 +14,7 @@
 - **Remembers you.** After each conversation Rum keeps short notes about you, and writes a journal once a day. You can read, edit and delete all of it.
 - **Meets you properly.** The first time you talk, Rum speaks first, gets to know you and chooses its own name.
 - **Sees your code.** With IntelliJ (or another JetBrains IDE, or VS Code) focused, ask "what does this do?" and Rum explains the open file, one piece at a time.
+- **Looks at your screen when you ask.** Say "look at my screen" or "what do you see?" and Rum takes one screenshot and talks about it. It never looks unless you ask.
 - **Any brain.** Your Claude, Codex, Gemini, Kimi or Qwen subscription (through its own command-line tool), or any API key (Anthropic, OpenAI, Gemini, Groq, OpenRouter, DeepSeek, Mistral, xAI, Together), or a local model with Ollama.
 - **Your choice of voice.** ElevenLabs (cloud), or local and free: ZONOS3-Mini or Kokoro. If one fails, Rum moves to the next.
 - **Fits Omarchy.** It's one Omarchy plugin: an orb button in the bar, a panel, the orb overlay and a keyboard shortcut, all in your theme's colors.
@@ -53,11 +54,13 @@ A single tap while Rum is closed does nothing, so it never opens by accident. A 
 
 **Asking about code:** keep your editor focused (just keep working in it), open the conversation, and ask "can you see what I have open?" or "what does this file do?". Rum gets the open file each time you speak, and only sends it again when the file changes.
 
+**Showing Rum your screen:** say "look at my screen", "what do you see?" or "can you see this error?". Rum takes one screenshot of the monitor you're on, right then, and talks about it. This works with Claude and with the API brains; with other command-line brains Rum tells you it can't see images.
+
 ## Settings
 
 Open settings with a middle-click on the orb. It's keyboard-first: **↑ ↓** to move, **← →** to change, **Enter** to edit, **Tab** for the next tab.
 
-- **Companion:** names, the orb (style, position, colors, size), how long Rum waits before answering, the talk keys, and whether Rum may see your code.
+- **Companion:** names, the orb (style, position, colors, size), how long Rum waits before answering, the talk keys, and whether Rum may see your code and look at your screen.
 - **Engine:** the brain (provider, model, API key), the voice and its volume, and speech recognition.
 - **Memory:** what Rum knows about you (forget any line), the journal, and how long conversations are kept.
 - **Conversations:** play back or delete past conversations.
@@ -76,7 +79,7 @@ Build it from [Zyphra/ZONOS3-Mini](https://github.com/Zyphra/ZONOS3-Mini) into `
 ## Your data and privacy
 
 - **Everything stays on your computer:** conversations, memory and settings live in `~/.local/share/omarum` and `~/.config/omarum`. API keys are in `~/.config/omarum/env`, readable only by you.
-- **What leaves it:** what you say goes to the brain you chose, and Rum's replies go to the voice service you chose (if it's a cloud one). With "See the code you're looking at" on, the open file goes to the brain too. You can turn that off in settings.
+- **What leaves it:** what you say goes to the brain you chose, and Rum's replies go to the voice service you chose (if it's a cloud one). With "See the code you're looking at" on, the open file goes to the brain too, and when you ask Rum to look at your screen, that one screenshot does. You can turn either off in settings → Companion → Awareness.
 - **Speech recognition** (Whisper) always runs locally.
 
 ## Remove
