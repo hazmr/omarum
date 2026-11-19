@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from datetime import datetime
 from typing import Awaitable, Callable
 
 from loguru import logger
@@ -18,7 +19,8 @@ from pipecat.processors.aggregators.llm_response_universal import (
 from pipecat.services.whisper.stt import WhisperSTTService
 from pipecat.transports.local.audio import LocalAudioTransport, LocalAudioTransportParams
 
-from omarum import persona
+from omarum.context import build_system_prompt
+from omarum.store import Store
 from omarum.claude_code_llm import ClaudeCodeLLMService
 from omarum.config import Config
 from omarum.levels import LatencyClock, StateTap
@@ -29,7 +31,9 @@ from omarum.models import pick_whisper, resolve_whisper_model
 Emit = Callable[[dict], None]
 
 
-def build_pipeline(cfg: Config, emit: Emit) -> tuple[PipelineTask, Callable[[], Awaitable[None]]]:
+def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, Callable[[], Awaitable[None]]]:
+    store = store or Store()
+    store.ensure()
     clock = LatencyClock()
     transport = LocalAudioTransport(
         LocalAudioTransportParams(audio_in_enabled=True, audio_out_enabled=True)
@@ -46,7 +50,7 @@ def build_pipeline(cfg: Config, emit: Emit) -> tuple[PipelineTask, Callable[[], 
     )
     llm = ClaudeCodeLLMService(
         model=cfg.brain_model,
-        system_prompt=persona.render(cfg),
+        system_prompt=build_system_prompt(cfg, store, datetime.now()),
         on_error=lambda reason: emit({"type": "state", "state": "error", "reason": reason}),
     )
     tts = build_tts(cfg, {**load_env_file(), **os.environ})

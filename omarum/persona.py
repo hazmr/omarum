@@ -22,3 +22,19 @@ Your words are spoken aloud. Never use markdown, lists, emoji or code; write pla
 
 def render(cfg: Config) -> str:
     return DEFAULT_PERSONA.format(name=cfg.companion_name, user=cfg.user_name)
+
+
+def _fill(text: str, values: dict[str, str]) -> str:
+    """Replace {name}/{user} only; leave any other braces exactly as written."""
+    for key, value in values.items():
+        text = text.replace("{" + key + "}", value)
+    return text
+
+
+def load(cfg: Config, store) -> str:
+    """The persona from persona.md (created from the default on first use), names filled in."""
+    path = store.persona_path
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(DEFAULT_PERSONA)
+    return _fill(path.read_text(), {"name": cfg.companion_name, "user": cfg.user_name})
