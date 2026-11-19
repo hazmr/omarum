@@ -129,3 +129,14 @@ def test_keys_while_editing_act_like_a_form():
     assert edit_key("Tab") == ("save", +1)
     assert edit_key("ISO_Left_Tab") == ("save", -1)
     assert edit_key("a") is None and edit_key("Left") is None  # typing and moving the cursor stay in the field
+
+
+def test_wait_before_answering_is_a_setting():
+    from omarum.config import Config
+    from omarum.settings_model import display, row, step
+
+    r = row("vad_stop_secs")
+    assert r.tab == "Companion" and r.kind == "slider" and r.label == "Wait before answering"
+    assert Config().vad_stop_secs == 0.8  # a breath or "hmm" no longer ends your turn
+    assert display(r, 0.8) == "0.8s"
+    assert step(r, 0.8, +1) == 0.9 and step(r, 2.0, +1) == 2.0 and step(r, 0.3, -1) == 0.3

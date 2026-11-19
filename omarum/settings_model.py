@@ -42,6 +42,8 @@ ROWS: list[Row] = [
         ("top-right", "top-center", "top-left", "center", "bottom-center")),
     Row("Companion", "Orb", "Colors", "orb_colors", "cycle", ("theme", "warm", "glass", "mono")),
     Row("Companion", "Orb", "Size", "orb_size", "slider", (96, 320, 16, "px")),
+    Row("Companion", "Conversation", "Wait before answering", "vad_stop_secs", "slider", (0.3, 2.0, 0.1, "s"),
+        hint="how long you can pause mid-sentence before Rum replies"),
     Row("Companion", "Conversation", "Ends after silence", "idle_timeout_secs", "slider", (4, 30, 2, "s")),
     Row("Companion", "Conversation", "Words needed to interrupt", "interrupt_min_words", "slider", (1, 6, 1, "")),
     Row("Companion", "Conversation", "Mute mic while talking", "mute_while_speaking", "toggle",

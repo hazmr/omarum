@@ -97,5 +97,5 @@ def test_trim_gives_up_after_max():
 
 
 def test_faster_turn_taking_defaults():
-    assert Config().vad_stop_secs == 0.3
+    assert Config().vad_stop_secs == 0.8
     assert Config().whisper_ttfs_p99 == 0.05
