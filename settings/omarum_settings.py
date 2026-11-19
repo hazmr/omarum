@@ -206,7 +206,7 @@ class Settings(Gtk.ApplicationWindow):
             child = self.list.get_first_child()
         focus_widget = None
         for i, it in enumerate(self.items):
-            w = self.render_item(it, focused=(i == self.index))
+            w = self.render_item(it, focused=(i == self.index), index=i)
             if i == self.index:
                 focus_widget = w
             if it.selectable:
@@ -232,7 +232,7 @@ class Settings(Gtk.ApplicationWindow):
                 adj.set_value(bottom - adj.get_page_size() + 20)
         return False
 
-    def render_item(self, it: Item, focused: bool) -> Gtk.Widget:
+    def render_item(self, it: Item, focused: bool, index: int = 0) -> Gtk.Widget:
         if it.kind == "group":
             g = Gtk.Label(label=it.label, xalign=0)
             g.add_css_class("group")
@@ -252,7 +252,7 @@ class Settings(Gtk.ApplicationWindow):
             label.set_size_request(260, -1)
         row.append(label)
         if it.kind == "setting":
-            row.append(self.render_value(it.row, focused))
+            row.append(self.render_value(it.row, focused, index))
         elif it.kind == "info" and it.data is not None:
             mark = Gtk.Label(label="● ok" if it.data else "○ missing")
             mark.add_css_class("ok" if it.data else "bad")
@@ -265,7 +265,43 @@ class Settings(Gtk.ApplicationWindow):
             row.append(hint)
         return row
 
-    def render_value(self, r: sm.Row, focused: bool) -> Gtk.Widget:
+    def clickable(self, widget: Gtk.Widget, action) -> Gtk.Widget:
+        """A click on this part of a row does `action` (and not the row's own click)."""
+        g = Gtk.GestureClick()
+        g.connect("pressed", lambda gesture, *_a: gesture.set_state(Gtk.EventSequenceState.CLAIMED))
+        g.connect("released", lambda *_a: action())
+        widget.add_controller(g)
+        widget.set_cursor_from_name("pointer")
+        return widget
+
+    def pick(self, i: int, r: sm.Row, value) -> None:
+        """Clicked one option of a row: select the row and set exactly that value."""
+        if self.editing is not None:
+            self.finish_edit(self.editing_row, self.editing.get_text())
+        self.index = i
+        if value != self.value_of(r):
+            self.save(r.key, value)
+        self.render()
+
+    def nudge(self, i: int, direction: int) -> None:
+        """Clicked ‹ or › on a row: select it and step its value back or forward."""
+        if self.editing is not None:
+            self.finish_edit(self.editing_row, self.editing.get_text())
+        self.index = i
+        self.change(direction)
+
+    def arrows(self, i: int, middle: Gtk.Widget) -> Gtk.Box:
+        box = Gtk.Box(spacing=8)
+        for text, direction in (("‹", -1), (None, 0), ("›", +1)):
+            if text is None:
+                box.append(middle)
+                continue
+            lab = Gtk.Label(label=text)
+            lab.add_css_class("arrow")
+            box.append(self.clickable(lab, lambda d=direction: self.nudge(i, d)))
+        return box
+
+    def render_value(self, r: sm.Row, focused: bool, index: int = 0) -> Gtk.Widget:
         value = self.value_of(r)
         if focused and self.editing is not None:
             return self.editing
@@ -276,7 +312,7 @@ class Settings(Gtk.ApplicationWindow):
                 s.add_css_class("seg")
                 if opt == value:
                     s.add_css_class("on")
-                box.append(s)
+                box.append(self.clickable(s, lambda o=opt: self.pick(index, r, o)))
             return box
         if r.kind == "slider":
             lo, hi, _inc, _unit = r.options
@@ -284,18 +320,15 @@ class Settings(Gtk.ApplicationWindow):
             bar = "━" * filled + "●" + "─" * (20 - filled)
             v = Gtk.Label(label=f"{bar}  {sm.display(r, value)}")
             v.add_css_class("value")
-            return v
+            return self.arrows(index, v)
         if r.kind == "toggle":
             v = Gtk.Label(label=("[■■  on ]" if value else "[ off ■■]"))
             v.add_css_class("value")
             return v
         if r.kind in ("cycle", "model"):
-            box = Gtk.Box(spacing=8)
-            for text, cls in (("‹", "arrow"), (sm.display(r, value).center(18), "value"), ("›", "arrow")):
-                lab = Gtk.Label(label=text)
-                lab.add_css_class(cls)
-                box.append(lab)
-            return box
+            v = Gtk.Label(label=sm.display(r, value).center(18))
+            v.add_css_class("value")
+            return self.arrows(index, v)  # clicking the value itself: next value, or type a model
         if r.kind == "shortcut" and focused and self.capturing is r:
             v = Gtk.Label(label="press the new keys…")
             v.add_css_class("value")
