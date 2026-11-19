@@ -8,6 +8,7 @@ from omarum import persona
 from omarum.config import Config
 
 RECENT_JOURNALS = 3
+EARLIER_TODAY_LINES = 40
 
 
 def _read(path) -> str:
@@ -29,6 +30,19 @@ def _recent_journals(store, limit: int = RECENT_JOURNALS) -> list[tuple[date, st
     return entries[-limit:]
 
 
+def _earlier_today(cfg: Config, store, today: date, limit: int = EARLIER_TODAY_LINES) -> str:
+    """Today's conversations straight from the transcripts: instant, before any memory pass runs."""
+    from omarum.recorder import read_transcript
+
+    names = {"user": cfg.user_name, "companion": cfg.companion_name}
+    lines = [
+        f"{names.get(r.get('who'), r.get('who'))}: {r['text']}"
+        for d in store.conversations_on(today)
+        for r in read_transcript(d / "transcript.jsonl")
+    ]
+    return "\n".join(lines[-limit:])
+
+
 def build_system_prompt(cfg: Config, store, now: datetime) -> str:
     sections = [persona.load(cfg, store).strip()]
     profile = _read(store.profile_path)
@@ -38,5 +52,8 @@ def build_system_prompt(cfg: Config, store, now: datetime) -> str:
     if journals:
         body = "\n\n".join(f"### {d.isoformat()}\n{text}" for d, text in journals)
         sections.append(f"## Recent days\n{body}")
+    today = _earlier_today(cfg, store, now.date())
+    if today:
+        sections.append(f"## Earlier today\n{today}")
     sections.append(f"## Right now\nIt is {now.strftime('%A')}, {now.day} {now.strftime('%B %Y, %H:%M')}.")
     return "\n\n".join(sections) + "\n"

@@ -51,3 +51,26 @@ def test_unknown_braces_in_persona_do_not_crash(tmp_path):
     s.persona_path.write_text("You are {name}. Mood: {mood}. Odd { brace.")
     text = persona.load(Config(), s)
     assert text == "You are Rum. Mood: {mood}. Odd { brace."
+
+
+def test_earlier_today_is_in_the_prompt_immediately(tmp_path):
+    s = _store(tmp_path)
+    d = s.new_conversation(datetime(2026, 11, 19, 21, 0, 0))
+    (d / "transcript.jsonl").write_text(
+        '{"who":"user","text":"I am job hunting this week."}\n'
+        '{"who":"companion","text":"Good luck!"}\n'
+    )
+    old = s.new_conversation(datetime(2026, 11, 18, 21, 0, 0))
+    (old / "transcript.jsonl").write_text('{"who":"user","text":"yesterday stuff"}\n')
+    p = build_system_prompt(Config(user_name="Sam"), s, NOW)
+    assert "## Earlier today" in p
+    assert "Sam: I am job hunting this week." in p and "Rum: Good luck!" in p
+    assert "yesterday stuff" not in p
+
+
+def test_earlier_today_is_capped(tmp_path):
+    s = _store(tmp_path)
+    d = s.new_conversation(datetime(2026, 11, 19, 20, 0, 0))
+    (d / "transcript.jsonl").write_text("".join(f'{{"who":"user","text":"line {i}"}}\n' for i in range(100)))
+    p = build_system_prompt(Config(user_name="Sam"), s, NOW)
+    assert "line 99" in p and "line 59" not in p  # only the last 40 lines
