@@ -93,6 +93,38 @@ def status(p: Provider, env: dict, which=shutil.which, url: str = "") -> str:
     return "ready"
 
 
+_REAL: dict[str, str | None] = {}
+_LAUNCHERS = ("/mise/command-wrappers/", "/mise/shims/")
+
+
+def real_binary(name: str, which=shutil.which, run=None) -> str | None:
+    """The real program behind a command name.
+
+    mise's launchers run an update check before starting the tool, and that check can hang
+    (it froze Claude for minutes on 2026-11-19), so Rum starts the installed program directly.
+    """
+    import subprocess
+
+    path = which(name)
+    if not path or not any(w in path for w in _LAUNCHERS):
+        return path
+    try:
+        r = (run or subprocess.run)(["mise", "which", name], capture_output=True, text=True, timeout=5)
+        real = (r.stdout or "").strip()
+        if r.returncode == 0 and real:
+            return real
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return path
+
+
+def real_command(cmd: list[str]) -> list[str]:
+    """The command with its program swapped for the real one (looked up once per run)."""
+    if cmd[0] not in _REAL:
+        _REAL[cmd[0]] = real_binary(cmd[0])
+    return [_REAL[cmd[0]] or cmd[0], *cmd[1:]]
+
+
 def label(cfg) -> str:
     p, model = resolve(cfg)
     return f"{p.label} · {model}" if model else p.label
@@ -192,7 +224,7 @@ def complete(cfg, env: dict, system: str, prompt: str, timeout: int = 120,
 
             sandbox.mkdir(parents=True, exist_ok=True)
             cmd, stdin = _cli_command(p.id, model, f"{system}\n\n{prompt}")
-            r = (run_cli or subprocess.run)(cmd, input=stdin, capture_output=True, text=True,
+            r = (run_cli or subprocess.run)(real_command(cmd) if run_cli is None else cmd, input=stdin, capture_output=True, text=True,
                                             timeout=timeout, cwd=sandbox)
             if r.returncode != 0:
                 raise BrainUnavailable(_cli_error(p.id, r.stderr or "", r.returncode))

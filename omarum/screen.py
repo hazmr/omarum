@@ -124,8 +124,9 @@ def current_note(seen: Seen, run=subprocess.run, home: Path = Path.home()) -> st
 
 _LOOK = re.compile(
     r"\b(look(ing)? at (my |the |this |that )?(screen|this|that|it)\b"
-    r"|what (do|can) you see|can you see (this|that|it|my screen|the screen|what)"
-    r"|what'?s on (my|the) screen|(take|grab) a screenshot|screenshot|(check|see) (my|the) screen)",
+    r"|what (do|can|could) you see|(can|could|do) you see (this|that|it|my screen|the screen|what)"
+    r"|what('?s| is) on (my|the) screen|(take|grab) a screenshot|screenshot"
+    r"|(check|see|about) (my|the) screen)",
     re.IGNORECASE)
 
 

@@ -57,7 +57,8 @@ def test_long_files_are_trimmed(tmp_path):
 
 def test_asking_rum_to_look():
     for said in ("Can you look at my screen?", "what do you see", "Look at this.", "can you see this error",
-                 "take a screenshot", "What's on my screen right now?", "check my screen"):
+                 "take a screenshot", "What's on my screen right now?", "check my screen",
+                 "Could you see what is on my screen right now?", "what about my screen", "do you see my screen"):
         assert screen.wants_screenshot(said), said
     for said in ("I see what you mean", "look, I'm tired", "let's take a break", "what do you think"):
         assert not screen.wants_screenshot(said), said

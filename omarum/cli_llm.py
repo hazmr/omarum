@@ -23,7 +23,7 @@ from pipecat.processors.frame_processor import FrameDirection
 from pipecat.services.llm_service import LLMService
 from pipecat.services.settings import LLMSettings
 
-from omarum.brains import PROVIDERS
+from omarum.brains import PROVIDERS, real_command
 from omarum.claude_code_llm import BrainUnavailable
 
 SANDBOX = Path.home() / ".local" / "state" / "omarum" / "brain"
@@ -85,7 +85,7 @@ async def run_streaming(cmd: list[str], stdin: str | None, cwd: Path, provider_i
     cwd.mkdir(parents=True, exist_ok=True)
     try:
         proc = await asyncio.create_subprocess_exec(
-            *cmd, cwd=cwd,
+            *real_command(cmd), cwd=cwd,  # the real program, not a launcher that may hang
             stdin=asyncio.subprocess.PIPE if stdin is not None else asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
             env={**os.environ, "NO_COLOR": "1"}, limit=1 << 22,

@@ -51,7 +51,7 @@ async def test_start_prewarms_claude_process(monkeypatch):
     monkeypatch.setattr("omarum.claude_code_llm.asyncio.create_subprocess_exec", fake_exec)
     svc = ClaudeCodeLLMService(model="haiku", system_prompt="hi")
     await svc._prewarm()
-    assert len(spawned) == 1 and spawned[0][0] == "claude"
+    assert len(spawned) == 1 and spawned[0][0].endswith("claude")  # the real program (not a mise launcher) when there is one
 
 
 def test_screenshot_goes_to_claude_as_an_image_block():
@@ -63,3 +63,23 @@ def test_screenshot_goes_to_claude_as_an_image_block():
     assert content[0] == {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": "QUJD"}}
     assert content[1] == {"type": "text", "text": "what do you see?"}
     assert user_content([{"role": "user", "content": "hi"}]) == "hi"
+
+
+async def test_a_brain_that_never_answers_gives_an_error_not_a_freeze():
+    import asyncio
+
+    import pytest
+
+    from omarum.claude_code_llm import BrainUnavailable, ClaudeCodeLLMService
+
+    class Silent:
+        async def readline(self):
+            await asyncio.sleep(3600)
+
+    class Proc:
+        stdout = Silent()
+
+    svc = ClaudeCodeLLMService(model="haiku", system_prompt="x", reply_timeout=0.2)
+    with pytest.raises(BrainUnavailable, match="didn't answer"):
+        async for _ in svc._read_until_turn_end(Proc(), 0):
+            pass

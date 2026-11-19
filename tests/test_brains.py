@@ -198,3 +198,20 @@ def test_api_error_reasons_are_readable():
     assert r == "Ollama can't be reached: Connection error."
     r = brains.error_reason("Gemini", "GoogleLLMService#0 exception: 404 model not found")
     assert r.startswith("Gemini failed: ") and "404 model not found" in r
+
+
+def test_cli_launchers_from_mise_are_skipped():
+    """mise's launcher runs an update check first; it hung Claude for minutes (2026-11-19)."""
+    from omarum.brains import real_binary
+
+    class R:
+        def __init__(self, out, code=0): self.stdout, self.returncode = out, code
+
+    wrapper = "/home/u/.local/share/mise/command-wrappers/bin/claude"
+    which = lambda name: wrapper  # noqa: E731
+    run = lambda cmd, **kw: R("/home/u/.local/share/mise/installs/claude/2.1/claude\n") if cmd[:2] == ["mise", "which"] else R("", 1)  # noqa: E731
+    assert real_binary("claude", which=which, run=run) == "/home/u/.local/share/mise/installs/claude/2.1/claude"
+    assert real_binary("claude", which=lambda n: "/usr/bin/claude", run=run) == "/usr/bin/claude"
+    assert real_binary("claude", which=lambda n: None, run=run) is None
+    failing = lambda cmd, **kw: R("", 1)  # noqa: E731
+    assert real_binary("claude", which=which, run=failing) == wrapper  # mise can't say: use the launcher

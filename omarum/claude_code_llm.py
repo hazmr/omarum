@@ -105,7 +105,9 @@ def user_content(messages: list):
 class ClaudeCodeLLMService(LLMService):
     reports_own_errors = True  # through on_error, with a better reason
 
-    def __init__(self, *, model: str, system_prompt: str, on_error=None, **kwargs) -> None:
+    def __init__(self, *, model: str, system_prompt: str, on_error=None, reply_timeout: float = 30.0,
+                 **kwargs) -> None:
+        self._reply_timeout = reply_timeout  # no answer starting by then: an error, never an endless "thinking"
         # Claude Code owns sampling; declare every setting so pipecat doesn't complain.
         settings = LLMSettings(
             model=model, system_instruction=system_prompt, temperature=None, max_tokens=None,
@@ -137,8 +139,10 @@ class ClaudeCodeLLMService(LLMService):
             return self._proc
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         try:
+            from omarum.brains import real_command
+
             self._proc = await asyncio.create_subprocess_exec(
-                *claude_command(self._model, self._system_prompt),
+                *real_command(claude_command(self._model, self._system_prompt)),  # the real claude, not mise's launcher
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
@@ -153,7 +157,10 @@ class ClaudeCodeLLMService(LLMService):
     async def _read_until_turn_end(self, proc, turn: int):
         """Yield text for `turn`; silently drain earlier (interrupted) turns."""
         while True:
-            line = await proc.stdout.readline()
+            try:
+                line = await asyncio.wait_for(proc.stdout.readline(), self._reply_timeout)
+            except asyncio.TimeoutError:
+                raise BrainUnavailable(f"Claude didn't answer in {self._reply_timeout:.0f} s; try again") from None
             if not line:
                 raise BrainUnavailable("claude exited (logged out or usage limit?)")
             kind, text = parse_line(line)

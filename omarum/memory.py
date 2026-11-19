@@ -53,7 +53,9 @@ def run_claude(system: str, prompt: str, model: str = "haiku", timeout: int = 12
     ]
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     try:
-        result = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=timeout, cwd=DATA_DIR)
+        from omarum.brains import real_command
+
+        result = subprocess.run(real_command(cmd), input=prompt, capture_output=True, text=True, timeout=timeout, cwd=DATA_DIR)
     except subprocess.TimeoutExpired as exc:
         raise MemoryPassFailed("claude timed out") from exc
     if result.returncode != 0:
