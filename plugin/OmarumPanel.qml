@@ -86,6 +86,7 @@ Panel {
     Qt.callLater(function() { if (panel.loadedContent) panel.loadedContent.forceActiveFocus() })
   }
   Engine { id: engine }
+  Orb { engine: engine }
 
   ShellIpc {
     target: root.ipcTarget
