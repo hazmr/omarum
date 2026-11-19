@@ -52,7 +52,7 @@ def test_leveler_brings_a_quiet_voice_to_speaking_level():
     lev = Leveler(volume=1.0)
     out = [lev.process(f) for f in _speech(-31)]  # what ZONOS3 "Willow" measured
     level, peak = _dbfs(out[25:])  # after the first half second
-    assert -22 <= level <= -18
+    assert -16 <= level <= -12  # like videos and music (about -14), not quieter
     assert peak < 32767  # no clipping
 
 

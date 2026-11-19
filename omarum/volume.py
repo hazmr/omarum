@@ -1,9 +1,9 @@
 """Rum's loudness, just before the speakers.
 
-Voices come out at very different levels (ZONOS3 "Willow" measured about -31 dBFS, normal
-speech audio sits near -20), so a fixed boost can't fit them all. The Leveler brings any
-voice to a speaking level, leaves silence alone, never clips, and the user's volume slider
-scales the result."""
+Voices come out at very different levels (ZONOS3 "Willow" measured -27 to -33 dBFS), so a
+fixed boost can't fit them all. The Leveler brings any voice to about -14 dBFS (as loud as
+videos and music, which laptop speakers need), leaves silence alone, never clips, and the
+user's volume slider scales the result."""
 
 from __future__ import annotations
 
@@ -23,9 +23,9 @@ def scale_pcm16(pcm: bytes, gain: float) -> bytes:
 
 import math
 
-TARGET_DBFS = -20.0   # speaking level
+TARGET_DBFS = -14.0   # as loud as videos and music; laptop speakers need it
 SILENCE_DBFS = -50.0  # quieter than this is a pause: don't chase it
-MAX_GAIN = 12.0       # about +21 dB at most
+MAX_GAIN = 20.0       # about +26 dB at most
 PEAK_LIMIT = 32000
 
 
