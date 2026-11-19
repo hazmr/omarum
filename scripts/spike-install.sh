@@ -20,6 +20,12 @@ LUA
 grep -q 'hypr.omarum' "$hypr/bindings.lua" || printf '\n-- Omarum voice companion\npcall(require, "hypr.omarum")\n' >> "$hypr/bindings.lua"
 hyprctl reload >/dev/null
 
+# Follow Omarchy theme changes: the theme-set hook asks the orb to reload its colors.
+hookdir="$HOME/.config/omarchy/hooks/theme-set.d"
+mkdir -p "$hookdir"
+printf '#!/bin/sh\n# Added by Omarum: refresh the orb colors when the Omarchy theme changes.\n"%s" reload >/dev/null 2>&1 || true\n' "$omarum_bin" > "$hookdir/50-omarum"
+chmod +x "$hookdir/50-omarum"
+
 # (Re)start the daemon and the orb in the background.
 pkill -f "^[^ ]*sh -c while true; do .*omarum.* daemon" 2>/dev/null || true
 pkill -f "^[^ ]*python[^ ]* [^ ]*/bin/omarum daemon" 2>/dev/null || true

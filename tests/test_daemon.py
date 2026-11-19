@@ -322,3 +322,22 @@ async def test_journals_for_missing_days_queued_at_start(tmp_path, monkeypatch):
     (c / "transcript.jsonl").write_text('{"who":"user","text":"hi"}\n')
     d.on_startup(_datetime(2026, 11, 19, 12, 0))
     assert calls == [("journal", _date(2026, 11, 17))]
+
+
+async def test_reload_broadcasts():
+    d = make(FakeFactory())
+    r = await d.handle({"cmd": "reload"})
+    assert r["ok"] and {"type": "reload"} in d.hub.sent
+
+
+def test_cli_reload_command(monkeypatch, capsys):
+    seen = {}
+
+    def fake_send(cmd, path, timeout=2.0):
+        seen.update(cmd=cmd, timeout=timeout)
+        return {"ok": True, "state": "idle"}
+
+    monkeypatch.setattr("omarum.cli.send_command", fake_send)
+    with pytest.raises(SystemExit):
+        cli.main(["reload"])
+    assert seen == {"cmd": "reload", "timeout": 2.0}

@@ -144,6 +144,9 @@ class Daemon:
         match cmd.get("cmd"):
             case "status":
                 return self._reply()
+            case "reload":
+                self.hub.broadcast({"type": "reload"})  # the orb re-reads config and theme
+                return self._reply()
             case "start":
                 return await self._start()
             case "stop":
