@@ -24,6 +24,7 @@ from omarum.config import load_config  # noqa: E402
 from omarum.configio import has_secret, save_config, set_secret  # noqa: E402
 from omarum.ipc import DaemonNotRunning, send_command  # noqa: E402
 from omarum.models import MODELS_DIR  # noqa: E402
+from omarum.shortcuts import apply as apply_shortcuts, conflicts, current_binds, normalize  # noqa: E402
 from omarum.store import Store  # noqa: E402
 from omarum.theme import ui_colors  # noqa: E402
 from omarum.zonos3_tts import is_installed as zonos3_installed  # noqa: E402
@@ -78,6 +79,7 @@ class Settings(Gtk.ApplicationWindow):
         self.armed: str | None = None  # "forget:3" / "delete:<dir>" waiting for a second d
         self.player: subprocess.Popen | None = None
         self.message = ""
+        self.capturing: sm.Row | None = None  # recording a new shortcut for this row
 
         provider = Gtk.CssProvider()
         provider.load_from_string(css(ui_colors()))
@@ -276,7 +278,11 @@ class Settings(Gtk.ApplicationWindow):
                 lab.add_css_class(cls)
                 box.append(lab)
             return box
-        v = Gtk.Label(label=sm.display(r, value) if r.kind in ("secret", "text") else "")
+        if r.kind == "shortcut" and focused and self.capturing is r:
+            v = Gtk.Label(label="press the new keys…")
+            v.add_css_class("value")
+            return v
+        v = Gtk.Label(label=sm.display(r, value) if r.kind in ("secret", "text", "shortcut") else "")
         v.add_css_class("value")
         return v
 
@@ -291,7 +297,7 @@ class Settings(Gtk.ApplicationWindow):
 
     def change(self, direction: int) -> None:
         it = self.items[self.index]
-        if it.kind != "setting" or it.row.kind in ("text", "secret", "action"):
+        if it.kind != "setting" or it.row.kind in ("text", "secret", "action", "shortcut"):
             return
         new = sm.step(it.row, self.value_of(it.row), direction)
         if new != self.value_of(it.row):
@@ -302,6 +308,10 @@ class Settings(Gtk.ApplicationWindow):
         it = self.items[self.index]
         if it.kind == "setting" and it.row.kind in ("text", "secret"):
             self.start_edit(it.row)
+        elif it.kind == "setting" and it.row.kind == "shortcut":
+            self.capturing = it.row
+            self.message = "Press the new shortcut   ·   Esc cancel   ·   Backspace remove"
+            self.render()
         elif it.kind == "setting" and it.row.kind == "action":
             out = library.export(self.store, Path.home())
             self.flash(f"Exported to {out}")
@@ -333,6 +343,37 @@ class Settings(Gtk.ApplicationWindow):
         elif text.strip():
             self.save(r.key, text.strip())
         self.render()
+
+    MODIFIER_KEYS = {"Shift_L", "Shift_R", "Control_L", "Control_R", "Alt_L", "Alt_R", "Super_L", "Super_R",
+                     "Meta_L", "Meta_R", "ISO_Level3_Shift", "Hyper_L", "Hyper_R"}
+
+    def capture(self, keyval, state) -> None:
+        name = Gdk.keyval_name(keyval) or ""
+        if name in self.MODIFIER_KEYS:
+            return  # wait for the real key
+        r, self.capturing = self.capturing, None
+        if keyval == Gdk.KEY_Escape and not state & Gdk.ModifierType.MODIFIER_MASK:
+            self.message = ""
+            self.render()
+            return
+        if keyval == Gdk.KEY_BackSpace and not state & Gdk.ModifierType.MODIFIER_MASK:
+            combo = ""
+        else:
+            mods = [m for m, mask in (("SUPER", Gdk.ModifierType.SUPER_MASK), ("CTRL", Gdk.ModifierType.CONTROL_MASK),
+                                      ("ALT", Gdk.ModifierType.ALT_MASK), ("SHIFT", Gdk.ModifierType.SHIFT_MASK))
+                    if state & mask]
+            key = Gdk.keyval_name(Gdk.keyval_to_lower(keyval)) or name
+            combo = normalize("+".join(mods + [key]))
+        self.values[r.key] = combo
+        save_config({r.key: combo})
+        try:
+            apply_shortcuts(load_config(), shutil.which("omarum") or "omarum")
+        except OSError as exc:
+            self.flash(f"Saved, but Hyprland didn't reload: {exc}")
+            return
+        clash = conflicts(combo, current_binds())
+        self.message = ""
+        self.flash(f"Saved. Also used by: {', '.join(clash)}" if clash else ("Saved" if combo else "Shortcut removed"))
 
     def play(self, talk) -> None:
         self.stop_playback()
@@ -417,6 +458,9 @@ class Settings(Gtk.ApplicationWindow):
         self.activate()
 
     def on_key(self, _ctrl, keyval, _code, state) -> bool:
+        if self.capturing is not None:
+            self.capture(keyval, state)
+            return True
         if self.editing is not None:
             if keyval == Gdk.KEY_Escape:
                 self.editing = None

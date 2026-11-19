@@ -11,7 +11,7 @@ from omarum.ipc import SOCKET_PATH, DaemonNotRunning, send_command
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="omarum", description="Talk to Rum.")
-    parser.add_argument("command", choices=["daemon", "toggle", "start", "stop", "status", "reload", "settings", "ptt_down", "ptt_up"])
+    parser.add_argument("command", choices=["daemon", "toggle", "start", "stop", "status", "reload", "settings", "ptt_down", "ptt_up", "shortcuts"])
     args = parser.parse_args(argv)
 
     if args.command == "settings":
@@ -20,6 +20,20 @@ def main(argv: list[str] | None = None) -> None:
 
         launcher = Path(__file__).resolve().parent.parent / "bin" / "omarum-settings"
         os.execv(str(launcher), [str(launcher)])
+
+    if args.command == "shortcuts":
+        import shutil
+
+        from omarum.config import load_config
+        from omarum.shortcuts import apply, conflicts, current_binds
+
+        cfg = load_config()
+        apply(cfg, shutil.which("omarum") or sys.argv[0])
+        for name in ("talk_shortcut", "settings_shortcut"):
+            for c in conflicts(getattr(cfg, name), current_binds()):
+                print(f"warning: {getattr(cfg, name)} is also used by: {c}", file=sys.stderr)
+        print(f"talk: {cfg.talk_shortcut or 'none'} (hold = talk, tap = hands-free)")
+        return
 
     if args.command == "daemon":
         from omarum.daemon import run_daemon

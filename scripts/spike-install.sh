@@ -7,18 +7,8 @@ hypr="$HOME/.config/hypr"
 uv tool install --quiet --force --editable "$repo"
 omarum_bin="$(command -v omarum || echo "$HOME/.local/bin/omarum")"
 
-# Pick a free shortcut: SUPER+H, else SUPER+ALT+H.
-key="SUPER + H"
-if hyprctl binds -j | python3 -c 'import json,sys; sys.exit(0 if any(b["modmask"]==64 and b["key"].lower()=="h" and b.get("description")!="Talk to Rum" for b in json.load(sys.stdin)) else 1)'; then
-  key="SUPER + ALT + H"
-fi
-
-cat > "$hypr/omarum.lua" <<LUA
--- Added by Omarum (spike). Remove this file and the require line in bindings.lua to undo.
-o.bind("$key", "Talk to Rum", "$omarum_bin toggle")
-LUA
-grep -q 'hypr.omarum' "$hypr/bindings.lua" || printf '\n-- Omarum voice companion\npcall(require, "hypr.omarum")\n' >> "$hypr/bindings.lua"
-hyprctl reload >/dev/null
+# Keyboard shortcuts come from config.toml (default: hold Ctrl+Shift+Space to talk, tap for hands-free).
+"$omarum_bin" shortcuts
 
 # Follow Omarchy theme changes: the theme-set hook asks the orb to reload its colors.
 hookdir="$HOME/.config/omarchy/hooks/theme-set.d"
@@ -36,4 +26,4 @@ mkdir -p "$HOME/.local/state/omarum"
 # Keep the daemon alive: if it ever crashes, restart it a second later.
 uwsm app -- sh -c "while true; do \"$omarum_bin\" daemon >>\"$HOME/.local/state/omarum/daemon.log\" 2>&1; echo \"[omarum] daemon exited (\$?), restarting\" >>\"$HOME/.local/state/omarum/daemon.log\"; sleep 1; done" >/dev/null 2>&1 &
 uwsm app -- "$repo/bin/omarum-orb" >"$HOME/.local/state/omarum/orb.log" 2>&1 </dev/null &
-echo "Omarum ready. Press $key to talk to Rum. Logs: ~/.local/state/omarum/"
+echo "Omarum ready. Hold Ctrl+Shift+Space to talk (tap it for hands-free). Settings: omarum settings. Logs: ~/.local/state/omarum/"

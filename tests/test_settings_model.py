@@ -52,3 +52,11 @@ def test_tabs_in_order_and_have_footers():
     assert TABS == ("Companion", "Engine", "Memory", "Conversations")
     assert all(FOOTERS[t] for t in TABS)
     assert rows_for("Companion")[0].key == "companion_name"
+
+
+def test_shortcut_rows_and_display():
+    r = row("talk_shortcut")
+    assert r.kind == "shortcut" and r.tab == "Companion"
+    assert display(r, "CTRL + SHIFT + SPACE") == "Ctrl + Shift + Space"
+    assert display(row("settings_shortcut"), "") == "none"
+    assert step(r, "CTRL + SHIFT + SPACE", +1) == "CTRL + SHIFT + SPACE"  # changed only by recording

@@ -20,7 +20,7 @@ class Row:
     group: str
     label: str
     key: str | None
-    kind: str  # cycle | seg | toggle | slider | text | secret | info | action
+    kind: str  # cycle | seg | toggle | slider | text | secret | shortcut | info | action
     options: tuple = ()
     hint: str = ""
 
@@ -38,6 +38,9 @@ ROWS: list[Row] = [
     Row("Companion", "Conversation", "Words needed to interrupt", "interrupt_min_words", "slider", (1, 6, 1, "")),
     Row("Companion", "Conversation", "Mute mic while talking", "mute_while_speaking", "toggle",
         hint="stops your companion hearing itself through the speakers"),
+    Row("Companion", "Shortcuts", "Talk (hold) / hands-free (tap)", "talk_shortcut", "shortcut",
+        hint="Enter, then press the new keys"),
+    Row("Companion", "Shortcuts", "Open settings", "settings_shortcut", "shortcut", hint="optional"),
     # Engine
     Row("Engine", "Brain", "Model", "brain_model", "seg", ("haiku", "sonnet", "opus"),
         hint="through your own claude CLI"),
@@ -65,6 +68,8 @@ def rows_for(tab: str) -> list[Row]:
 
 
 def display(r: Row, value) -> str:
+    if r.kind == "shortcut":
+        return " + ".join(p.capitalize() for p in value.split(" + ")) if value else "none"
     if r.kind == "toggle":
         return "on" if value else "off"
     if r.kind == "secret":
