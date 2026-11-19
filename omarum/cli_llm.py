@@ -111,6 +111,15 @@ async def run_streaming(cmd: list[str], stdin: str | None, cwd: Path, provider_i
             stderr_task.cancel()
 
 
+async def pump(cmd: list[str], stdin: str | None, cwd: Path, provider_id: str, sink) -> None:
+    """Hand every chunk to `sink`; however this ends (done, error, interruption), the CLI is gone."""
+    from contextlib import aclosing
+
+    async with aclosing(run_streaming(cmd, stdin, cwd, provider_id)) as chunks:
+        async for chunk in chunks:
+            await sink(chunk)
+
+
 class CliLLMService(LLMService):
     reports_own_errors = True  # through on_error, with a better reason
 
@@ -134,8 +143,7 @@ class CliLLMService(LLMService):
         cmd, stdin = cli_command(self._provider_id, self._model, prompt)
         await self.push_frame(LLMFullResponseStartFrame())
         try:
-            async for chunk in run_streaming(cmd, stdin, SANDBOX, self._provider_id):
-                await self._push_llm_text(chunk)
+            await pump(cmd, stdin, SANDBOX, self._provider_id, self._push_llm_text)
         finally:
             await self.push_frame(LLMFullResponseEndFrame())
 

@@ -95,3 +95,30 @@ def test_run_streaming_kills_on_cancel(tmp_path):
     pid = int(pidfile.read_text())
     with pytest.raises(ProcessLookupError):
         os.kill(pid, 0)
+
+
+def test_interruption_while_speaking_kills_the_cli(tmp_path):
+    """Cancelled while the reply is being handed on (not while reading), the CLI must still die."""
+    from omarum.cli_llm import pump
+
+    pidfile = tmp_path / "pid"
+    cmd = _script(tmp_path, f"import os,time\nopen({str(pidfile)!r},'w').write(str(os.getpid()))\n"
+                            "print('first', flush=True)\ntime.sleep(30)\n")
+
+    async def slow_sink(chunk):
+        await asyncio.sleep(30)  # e.g. the voice is busy
+
+    async def go():
+        t = asyncio.create_task(pump(cmd, None, tmp_path, "codex", slow_sink))
+        while not pidfile.exists():
+            await asyncio.sleep(0.05)
+        await asyncio.sleep(0.3)
+        t.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await t
+
+    asyncio.run(go())
+    import os
+
+    with pytest.raises(ProcessLookupError):
+        os.kill(int(pidfile.read_text()), 0)
