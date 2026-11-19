@@ -15,7 +15,9 @@ Item {
   readonly property string venv: home + "/.local/share/omarum/venv"
   readonly property string python: venv + "/bin/python"
   readonly property string socketPath: Quickshell.env("XDG_RUNTIME_DIR") + "/omarum.sock"
-  readonly property var env: ({ UV_PROJECT_ENVIRONMENT: venv, PYTHONUNBUFFERED: "1" })
+  // PIPEWIRE_LATENCY: a bigger playback buffer, so Rum's voice doesn't crackle when the machine is
+  // busy (a screen recorder, a build); ~43 ms is not noticeable in a conversation.
+  readonly property var env: ({ UV_PROJECT_ENVIRONMENT: venv, PYTHONUNBUFFERED: "1", PIPEWIRE_LATENCY: "2048/48000" })
 
   // checking | needs-uv | setup | starting | running | crashed | failed
   property string phase: "checking"

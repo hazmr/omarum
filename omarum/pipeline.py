@@ -46,7 +46,8 @@ def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, C
     session = Session(store, cfg, datetime.now())
     session.first_meeting = first_meeting
     transport = LocalAudioTransport(
-        LocalAudioTransportParams(audio_in_enabled=True, audio_out_enabled=True)
+        # 80 ms output chunks (default 40): fewer chances to run dry under load, which crackles.
+        LocalAudioTransportParams(audio_in_enabled=True, audio_out_enabled=True, audio_out_10ms_chunks=8)
     )
     def whisper(model: str, device: str, compute: str) -> WhisperSTTService:
         logger.info(f"whisper: {model} on {device}")
