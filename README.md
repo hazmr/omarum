@@ -2,12 +2,14 @@
 
 A voice companion for [Omarchy](https://omarchy.org). Press a shortcut, a small glowing orb appears, you talk, and **Rum** answers out loud. There's no chat window and no text, only the orb and two voices.
 
-> **Status: early prototype (phase 1 of 5).** It works on the author's machine. Memory, the settings app and proper packaging are still to come. See [the design](docs/superpowers/specs/2026-11-18-omarum-design.md).
+> **Status: phases 1–4 of 5 done.** It works on the author's machine; proper packaging (autostart, Omarchy menu, AUR) is next. See [the design](docs/superpowers/specs/2026-11-18-omarum-design.md).
 
 ## What works today
 
 - **Super + H** starts and stops a conversation. Rum also stops after 8 seconds of silence.
-- **The orb** (GTK4 layer-shell overlay, top right) follows the conversation in your Omarchy theme's colors: coral while you talk, blue while Rum talks, dim while waiting.
+- **Memory:** every conversation is saved locally (both voices + transcript). Rum updates plain-text notes about you after each talk, writes a daily journal, and starts every conversation knowing them.
+- **Settings:** `omarum settings` opens a keyboard-first window (Companion · Engine · Memory · Conversations) to change everything below, forget facts, and play back or delete conversations.
+- **The orb** (GTK4 layer-shell overlay) follows the conversation: your color while you talk, Rum's while Rum talks. Three styles (glow, lines, ring), five positions (center dims the screen), any size, colors from your Omarchy theme (updates live when you switch themes) or Warm/Glass/Mono.
 - **Ears:** Whisper runs locally (large-v3-turbo on an NVIDIA GPU, base.en on CPU).
 - **Brain:** your own logged-in Claude Code CLI (`claude -p`), using your existing subscription, for personal use.
 - **Voice:** you pick one, and if it fails, Rum moves down this order:
@@ -50,7 +52,7 @@ The daemon (`omarum/`, Python 3.12, [Pipecat](https://github.com/pipecat-ai/pipe
 ## Roadmap
 
 1. ✅ Prototype: talk, orb, voices
-2. Memory: Rum remembers you day to day; conversations are recorded locally
-3. The full orb: three styles, positions, animations
-4. A keyboard-first settings app in Omarchy's style
+2. ✅ Memory: Rum remembers you day to day; conversations are recorded locally
+3. ✅ The full orb: three styles, positions, palettes, live theme
+4. ✅ A keyboard-first settings app in Omarchy's style
 5. Packaging: systemd user service, Omarchy menu entry, AUR
