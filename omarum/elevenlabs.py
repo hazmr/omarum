@@ -17,6 +17,10 @@ API = "https://api.elevenlabs.io"
 CACHE = DATA_DIR / "elevenlabs-voices.json"
 
 
+KEY_ID_HINT = ("That's the key's ID, not the key: the key starts with sk_ and is shown only when you "
+               "create or rotate it (elevenlabs.io → Profile → API keys)")
+
+
 class ElevenLabsError(Exception):
     pass
 
@@ -29,6 +33,8 @@ def _explain(code: int, body: bytes) -> str:
     d = d if isinstance(d, dict) else {"message": str(d)}
     msg = str(d.get("message", ""))
     status = f"{d.get('status', '')} {d.get('code', '')}".lower()
+    if "api_key_id_used_as_api_key" in status:
+        return KEY_ID_HINT
     if "voices_read" in msg:
         return "Your key needs the 'Voices: Read' permission (elevenlabs.io → Profile → API keys → edit the key)"
     if "text_to_speech" in msg:
@@ -66,6 +72,8 @@ def check(key: str, voice_id: str, model: str, urlopen=None) -> str | None:
     """None if this key can speak with this voice, else why not (spends a few characters)."""
     if not key.strip():
         return "No ElevenLabs key yet"
+    if not key.strip().startswith("sk_"):
+        return KEY_ID_HINT
     try:
         audio = _call(key, f"/v1/text-to-speech/{voice_id}?output_format=pcm_16000",
                       {"text": "Hi.", "model_id": model}, urlopen=urlopen)

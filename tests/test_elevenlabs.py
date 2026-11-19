@@ -41,10 +41,10 @@ def test_missing_voices_permission_is_explained():
 
 def test_check_explains_paid_voice_and_bad_key():
     paid = _detail("payment_required", "Free users cannot use library voices via the API.", "paid_plan_required")
-    assert "paid" in elevenlabs.check("k", "v", "m", urlopen=_resp(402, paid)).lower()
+    assert "paid" in elevenlabs.check("sk_k", "v", "m", urlopen=_resp(402, paid)).lower()
     bad = _detail("invalid_api_key", "Invalid API key", "invalid_api_key")
-    assert "not valid" in elevenlabs.check("k", "v", "m", urlopen=_resp(401, bad))
-    assert elevenlabs.check("k", "v", "m", urlopen=_resp(200, b"\x00\x01" * 100)) is None
+    assert "not valid" in elevenlabs.check("sk_k", "v", "m", urlopen=_resp(401, bad))
+    assert elevenlabs.check("sk_k", "v", "m", urlopen=_resp(200, b"\x00\x01" * 100)) is None
     assert "no elevenlabs key" in elevenlabs.check("", "v", "m").lower()
 
 
@@ -53,3 +53,12 @@ def test_voice_cache_roundtrip(tmp_path):
     elevenlabs.save_cache([("p1", "Sarah", "premade")], f)
     assert elevenlabs.load_cache(f) == [("p1", "Sarah", "premade")]
     assert elevenlabs.load_cache(tmp_path / "missing.json") == []
+
+
+def test_key_id_pasted_instead_of_the_key_is_explained():
+    body = _detail("api_key_id_used_as_api_key",
+                   "API key ID used as API key - only valid API keys can be used. API keys start with 'sk_'",
+                   "invalid_api_key")
+    why = elevenlabs.check("sk_k", "v", "m", urlopen=_resp(400, body))
+    assert "ID" in why and "sk_" in why
+    assert "sk_" in elevenlabs.check("0" * 64, "v", "m")  # caught before even asking ElevenLabs
