@@ -50,3 +50,36 @@ async def test_companion_speaking_starts_when_audio_plays():
         expected_up_frames=[BotStartedSpeakingFrame],
     )
     assert {"type": "state", "state": "speaking"} in events
+
+
+async def test_speaker_tap_emits_real_companion_levels():
+    import struct
+
+    from pipecat.frames.frames import OutputAudioRawFrame
+
+    events: list[dict] = []
+    tap = StateTap(emit=events.append, who="speaker", clock=LatencyClock())
+    loud = struct.pack("<160h", *([20000, -20000] * 80))  # 10 ms at 16 kHz
+    await run_test(
+        tap,
+        frames_to_send=[OutputAudioRawFrame(audio=loud, sample_rate=16000, num_channels=1)],
+        expected_down_frames=[OutputAudioRawFrame],
+    )
+    levels = [e for e in events if e["type"] == "level"]
+    assert levels and levels[0]["who"] == "companion" and levels[0]["value"] > 0.5
+
+
+async def test_pre_speaker_companion_tap_sends_no_levels():
+    import struct
+
+    from pipecat.frames.frames import OutputAudioRawFrame
+
+    events: list[dict] = []
+    tap = StateTap(emit=events.append, who="companion", clock=LatencyClock())
+    loud = struct.pack("<160h", *([20000, -20000] * 80))
+    await run_test(
+        tap,
+        frames_to_send=[OutputAudioRawFrame(audio=loud, sample_rate=16000, num_channels=1)],
+        expected_down_frames=[OutputAudioRawFrame],
+    )
+    assert not [e for e in events if e["type"] == "level"]

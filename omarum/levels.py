@@ -66,7 +66,8 @@ class StateTap(FrameProcessor):
         now = time.monotonic()
         if now - self._last_level >= LEVEL_INTERVAL:
             self._last_level = now
-            self._emit({"type": "level", "who": self._who, "value": round(rms_level(audio), 3)})
+            who = "companion" if self._who == "speaker" else self._who
+            self._emit({"type": "level", "who": who, "value": round(rms_level(audio), 3)})
 
     def _state(self, state: str) -> None:
         self._emit({"type": "state", "state": state})
@@ -81,11 +82,15 @@ class StateTap(FrameProcessor):
             elif isinstance(frame, UserStoppedSpeakingFrame):
                 self._clock.user_stopped()
                 self._state("thinking")
+        elif self._who == "speaker":
+            # After the speaker output: frames arrive in 10 ms pieces right after each is
+            # played, so these levels move with the words actually heard.
+            if isinstance(frame, OutputAudioRawFrame):
+                self._level(frame.audio)
         else:
             if isinstance(frame, OutputAudioRawFrame):
                 if self._clock.user_stopped_at is not None:
                     self._clock.companion_audio()
-                self._level(frame.audio)
             elif isinstance(frame, BotStartedSpeakingFrame):
                 self._state("speaking")  # audio is actually playing (comes upstream from the transport)
             elif isinstance(frame, BotStoppedSpeakingFrame):

@@ -85,6 +85,7 @@ def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, C
         tts,
         StateTap(emit, "companion", clock),
         transport.output(),
+        StateTap(emit, "speaker", clock),
         recorder,
         aggregators.assistant(),
     ])

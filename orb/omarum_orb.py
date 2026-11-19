@@ -31,7 +31,7 @@ from omarum.config import load_config  # noqa: E402
 from omarum.ipc import SOCKET_PATH, decode, encode  # noqa: E402
 from omarum.orbplace import anchors, clamp_size, dims_screen, normalize_position  # noqa: E402
 from omarum.orbshapes import glow_layers, line_paths, normalize_style, ring_points  # noqa: E402
-from omarum.orbstate import display_state, speaking_energy  # noqa: E402
+from omarum.orbstate import companion_target, display_state, follow_energy  # noqa: E402
 from omarum.theme import palette_for, state_color  # noqa: E402
 
 VISIBLE = {"listening", "user_speaking", "thinking", "speaking", "error"}
@@ -49,6 +49,8 @@ class Orb:
         self.alpha = 0.0
         self.level_target = 0.0
         self.user_level = 0.0
+        self.companion_level = 0.0
+        self.companion_at = 0.0  # when the last real companion level arrived
         self.energy = 0.0
         self.error_since = 0.0
         self.t0 = time.monotonic()
@@ -78,6 +80,9 @@ class Orb:
             if msg.get("who") == "user" and self.state in ("user_speaking", "listening"):
                 self.user_level = max(self.user_level, value)
                 self.level_target = max(self.level_target, value)
+            elif msg.get("who") == "companion":
+                self.companion_level = value  # measured right after playback: in step with the words
+                self.companion_at = time.monotonic()
         return False  # one-shot GLib.idle_add
 
     # -- animation -------------------------------------------------------------
@@ -92,10 +97,12 @@ class Orb:
             self.alpha = max(target_alpha, self.alpha - step)
         shown = display_state(self.state, self.user_level)
         self.color = lerp(self.color, state_color(shown, self.palette), 0.12)
-        if self.state == "speaking":  # companion audio arrives in big chunks: animate a voice-like rhythm
-            self.level_target = max(self.level_target, speaking_energy(now - self.t0))
-        self.energy += (self.level_target - self.energy) * 0.15
-        self.level_target *= 0.9
+        if self.state == "speaking":
+            target = companion_target(self.companion_level, now - self.companion_at, now - self.t0)
+            self.level_target = max(self.level_target, target)
+            self.companion_level *= 0.7  # a level is only "now" for a frame or two
+        self.energy = follow_energy(self.energy, self.level_target)
+        self.level_target *= 0.82
         self.user_level *= 0.94
 
     def _alpha_now(self, t: float) -> float:
