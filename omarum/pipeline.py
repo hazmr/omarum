@@ -72,7 +72,7 @@ def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, C
     async def _keep_audio(_proc, user_audio, bot_audio, sample_rate, _channels):
         session.add_audio(user_audio, bot_audio, sample_rate)
 
-    session.meta = {"brain": brains.label(cfg), "voices": voice_chain(cfg, available_voices(env)), "latency_ms": clock.samples}
+    session.meta = {"brain": brains.label(cfg), "voices": voice_chain(cfg, available_voices(env, cfg)), "latency_ms": clock.samples}
     # The persona travels with the conversation, so API brains get it too; the CLI brains
     # skip system messages (they get the persona their own way).
     context = LLMContext(messages=[{"role": "system", "content": system_prompt}])

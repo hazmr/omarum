@@ -360,6 +360,9 @@ class Settings(Gtk.ApplicationWindow):
         it = self.items[self.index]
         if it.kind != "setting" or it.row.kind in ("text", "secret", "action", "shortcut"):
             return
+        if it.row.key == "elevenlabs_voice_id" and not self.eleven_voices:
+            self.flash("No voices yet: save a working ElevenLabs key first (it starts with sk_)")
+            return
         new = sm.step(it.row, self.value_of(it.row), direction)
         if new != self.value_of(it.row):
             self.save(it.row.key, new)

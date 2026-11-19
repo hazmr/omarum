@@ -29,11 +29,14 @@ def load_env_file(path: Path = ENV_PATH) -> dict[str, str]:
     return env
 
 
-def available_voices(env: dict[str, str]) -> set[str]:
+def available_voices(env: dict[str, str], cfg=None) -> set[str]:
     from omarum import zonos3_tts
 
     have = {"kokoro"}
-    if env.get("ELEVENLABS_API_KEY"):
+    key = env.get("ELEVENLABS_API_KEY", "").strip()
+    # A real key starts with sk_ (a pasted key ID doesn't), and a voice must be chosen;
+    # otherwise skip ElevenLabs instead of failing on every sentence.
+    if key.startswith("sk_") and (cfg is None or getattr(cfg, "elevenlabs_voice_id", "")):
         have.add("elevenlabs")
     if zonos3_tts.is_installed():
         have.add("zonos3")
@@ -64,7 +67,7 @@ def build_tts(cfg, env: dict[str, str]):
     """One TTS service, or a failover switcher over the chain."""
     from loguru import logger
 
-    names = voice_chain(cfg, available_voices(env))
+    names = voice_chain(cfg, available_voices(env, cfg))
     services = [_make(name, cfg, env) for name in names]
     logger.info(f"voices: {names}")
     if len(services) == 1:

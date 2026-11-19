@@ -99,3 +99,15 @@ def test_trim_gives_up_after_max():
 def test_faster_turn_taking_defaults():
     assert Config().vad_stop_secs == 0.8
     assert Config().whisper_ttfs_p99 == 0.05
+
+
+def test_elevenlabs_only_with_a_real_key_and_a_chosen_voice(monkeypatch):
+    from omarum import zonos3_tts
+    from omarum.config import Config
+    from omarum.voices import available_voices
+
+    monkeypatch.setattr(zonos3_tts, "is_installed", lambda: False)
+    good = {"ELEVENLABS_API_KEY": "sk_" + "a" * 48}
+    assert "elevenlabs" in available_voices(good, Config(elevenlabs_voice_id="v1"))
+    assert "elevenlabs" not in available_voices({"ELEVENLABS_API_KEY": "0" * 64}, Config(elevenlabs_voice_id="v1"))  # a key ID
+    assert "elevenlabs" not in available_voices(good, Config(elevenlabs_voice_id=""))  # no voice chosen
