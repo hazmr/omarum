@@ -60,3 +60,18 @@ async def test_command_reply(tmp_path: Path):
 def test_send_command_no_daemon_raises(tmp_path: Path):
     with pytest.raises(DaemonNotRunning):
         send_command("status", tmp_path / "missing.sock")
+
+
+async def test_watch_reports_off_then_reconnects(tmp_path: Path):
+    from omarum.ipc import watch
+
+    sock = tmp_path / "w.sock"
+    seen: list[dict] = []
+    stop = lambda: any(m.get("state") == "idle" for m in seen)
+    task = asyncio.create_task(asyncio.to_thread(watch, sock, seen.append, 0.05, stop))
+    await asyncio.sleep(0.15)
+    assert {"type": "state", "state": "off"} in seen
+    hub = await _start_hub(sock)
+    await asyncio.wait_for(task, 3)
+    assert seen[-1]["state"] == "idle"
+    await hub.close()

@@ -426,3 +426,19 @@ async def test_ptt_release_during_slow_start_applies_after(monkeypatch):
     await d.handle({"cmd": "ptt_up"})
     await down
     assert f.gate.is_open is False
+
+
+async def test_tap_opens_hands_free_then_closes():
+    f = GateFactory()
+    d = make(f)
+    await d.handle({"cmd": "tap"})
+    assert f.starts == 1 and f.gate.is_open and d._ptt.mode == "hands_free"
+    await d.handle({"cmd": "tap"})
+    assert d.state == "closed" and f.stops == 1
+
+
+async def test_tap_during_start_is_single_session():
+    f = GateFactory(build_delay=0.2)
+    d = make(f)
+    await asyncio.gather(d.handle({"cmd": "tap"}), d.handle({"cmd": "tap"}))
+    assert f.starts == 1

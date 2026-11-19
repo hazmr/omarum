@@ -11,7 +11,7 @@ from omarum.ipc import SOCKET_PATH, DaemonNotRunning, send_command
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="omarum", description="Talk to Rum.")
-    parser.add_argument("command", choices=["daemon", "toggle", "start", "stop", "status", "reload", "settings", "ptt_down", "ptt_up", "shortcuts"])
+    parser.add_argument("command", choices=["daemon", "toggle", "start", "stop", "status", "reload", "settings", "ptt_down", "ptt_up", "shortcuts", "tap", "watch"])
     args = parser.parse_args(argv)
 
     if args.command == "settings":
@@ -20,6 +20,25 @@ def main(argv: list[str] | None = None) -> None:
 
         launcher = Path(__file__).resolve().parent.parent / "bin" / "omarum-settings"
         os.execv(str(launcher), [str(launcher)])
+
+    if args.command == "watch":  # for the bar button: one JSON line per state change
+        import json
+
+        from omarum.ipc import watch
+
+        last = [None]
+
+        def show(msg: dict) -> None:
+            out = {k: v for k, v in msg.items() if k != "type"}
+            if out != last[0]:
+                last[0] = out
+                print(json.dumps(out), flush=True)
+
+        try:
+            watch(SOCKET_PATH, show)
+        except (KeyboardInterrupt, BrokenPipeError):
+            pass
+        return
 
     if args.command == "shortcuts":
         import shutil

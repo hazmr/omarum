@@ -152,6 +152,12 @@ class Daemon:
             case "ptt_down":
                 return await self._ptt_act(self._ptt.press(
                     time.monotonic(), open_=self._active or self._starting, speaking=self.state == "speaking"))
+            case "tap":  # the bar button: a press and release of zero length
+                if self._starting:
+                    return self._reply()
+                now = time.monotonic()
+                actions = self._ptt.press(now, open_=self._active, speaking=self.state == "speaking")
+                return await self._ptt_act(actions + self._ptt.release(now))
             case "ptt_up":
                 return await self._ptt_act(self._ptt.release(time.monotonic()))
             case "reload":

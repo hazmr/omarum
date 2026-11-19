@@ -106,3 +106,31 @@ def send_command(cmd: str, path: Path = SOCKET_PATH, timeout: float = 2.0) -> di
             if "ok" in msg:
                 return msg
     raise DaemonNotRunning("connection closed without a reply")
+
+
+def watch(path: Path, on_message: Callable[[dict], None], retry_secs: float = 1.0,
+          stop: Callable[[], bool] | None = None) -> None:
+    """Follow the daemon's state (levels skipped). Down or gone: report 'off' and retry."""
+    import time
+
+    stop = stop or (lambda: False)
+    while not stop():
+        try:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+                s.connect(str(path))
+                s.sendall(encode({"cmd": "status"}))
+                with s.makefile("rb") as f:
+                    for line in f:
+                        try:
+                            msg = decode(line)
+                        except ValueError:
+                            continue
+                        if msg.get("type") == "state" or "ok" in msg:
+                            on_message({"type": "state", "state": msg.get("state", "idle"),
+                                        **({"reason": msg["reason"]} if msg.get("reason") else {})})
+                        if stop():
+                            return
+        except OSError:
+            pass
+        on_message({"type": "state", "state": "off"})
+        time.sleep(retry_secs)
