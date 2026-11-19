@@ -17,7 +17,13 @@ Scope {
   readonly property string style: ["glow", "lines", "ring"].indexOf(cfg.style) >= 0 ? cfg.style : "glow"
   readonly property string position: ["top-right", "top-center", "top-left", "center", "bottom-center"].indexOf(cfg.position) >= 0 ? cfg.position : "top-right"
   readonly property int size: Math.max(96, Math.min(320, Number(cfg.size) || 160))
-  readonly property var colors: engine.info.colors || ({ user: "#cc8979", companion: "#82c9ed", idle: "#584e51", error: "#ee7350" })
+  // The palette arrives as "#rrggbb" text; turn it into real colors once. Mixing text
+  // in mix() gave NaN channels, which drew Rum's and your color as black.
+  readonly property var hex: engine.info.colors || ({ user: "#cc8979", companion: "#82c9ed", idle: "#584e51", error: "#ee7350" })
+  readonly property var colors: ({
+    user: Qt.color(hex.user || "#cc8979"), companion: Qt.color(hex.companion || "#82c9ed"),
+    idle: Qt.color(hex.idle || "#584e51"), error: Qt.color(hex.error || "#ee7350")
+  })
   readonly property var visibleStates: ["listening", "user_speaking", "thinking", "speaking", "error"]
   readonly property real voiceThreshold: 0.25  // omarum.orbstate.USER_VOICE_THRESHOLD
 
@@ -41,7 +47,7 @@ Scope {
   }
   // Listening / thinking: Rum's color, softened toward the theme's text color so it reads
   // as calm but stays clearly visible (the theme's "muted" color is nearly black on dark themes).
-  readonly property color restColor: mix(Qt.color(colors.companion), Commons.Color.foreground, 0.35)
+  readonly property color restColor: mix(colors.companion, Commons.Color.foreground, 0.35)
   function targetColor(s) {
     if (s === "user_speaking") return colors.user
     if (s === "speaking") return colors.companion
