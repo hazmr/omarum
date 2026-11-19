@@ -16,15 +16,16 @@ Panel {
   ipcTarget: "omarum.panel"
   manageIpc: false
 
-  property string state: "off"
-  property string reason: ""      // why, when the state is "error"
-  property var info: ({})
+  readonly property string state: engine.state
+  readonly property string reason: engine.phase === "running" ? engine.reason : (engine.reason || engine.setupMessage)
+  readonly property var info: engine.info
   property int cursor: 0          // -1 = the hands-free switch, 0.. = rows
   property bool cursorActive: false
   property real energy: 0
   property real clock: 0
 
   readonly property bool running: state !== "off"
+  readonly property bool settingUp: engine.phase === "checking" || engine.phase === "setup" || engine.phase === "starting"
   readonly property bool open_: ["idle", "closed", "off", "error"].indexOf(state) < 0
   readonly property color foreground: bar ? bar.foreground : Commons.Color.foreground
   readonly property color dim: Qt.darker(foreground, 1.55)
@@ -32,7 +33,7 @@ Panel {
   readonly property var colors: info.colors || ({ user: "#cc8979", companion: "#82c9ed", idle: "#584e51", error: "#ee7350" })
   readonly property string name: info.name || "Rum"
   readonly property var labels: ({
-    off: "not running", idle: "ready", closed: "ready", listening: "listening",
+    off: "starting", idle: "ready", closed: "ready", listening: "listening",
     user_speaking: "hearing you", thinking: "thinking", speaking: "talking", error: "something went wrong"
   })
 
@@ -46,32 +47,34 @@ Panel {
 
   readonly property var rows: {
     var out = []
-    if (!running) out.push({ icon: "󰐊", label: "Start " + name, value: "", cmd: "systemctl --user start omarum omarum-orb" })
-    out.push({ icon: "󰧑", label: "Brain", value: info.brain || "", cmd: "omarum settings engine" })
-    out.push({ icon: "󰍬", label: "Ears", value: info.ears || "", cmd: "omarum settings engine" })
-    out.push({ icon: "󰕾", label: "Voice", value: info.voice || "", cmd: "omarum settings engine" })
-    out.push({ icon: "󰌌", label: "Talk", value: info.shortcut || "", cmd: "omarum settings companion" })
-    if (info.last) out.push({ last: true, label: info.last.text || "…", value: [info.last.when, info.last.length].filter(function(s) { return s }).join(" · "), cmd: "omarum settings conversations" })
-    out.push({ icon: "󰆼", label: "Conversations", value: info.talks !== undefined ? String(info.talks) : "", cmd: "omarum settings conversations", chevron: true })
-    out.push({ icon: "󰒓", label: "Settings", value: "", cmd: "omarum settings", chevron: true })
+    if (engine.phase === "needs-uv") out.push({ icon: "󰏗", label: "Install uv", value: "", cmd: "install-uv" })
+    if (engine.phase === "failed") out.push({ icon: "󰑓", label: "Try again", value: "", cmd: "retry" })
+    out.push({ icon: "󰧑", label: "Brain", value: info.brain || "", tab: "engine" })
+    out.push({ icon: "󰍬", label: "Ears", value: info.ears || "", tab: "engine" })
+    out.push({ icon: "󰕾", label: "Voice", value: info.voice || "", tab: "engine" })
+    out.push({ icon: "󰌌", label: "Talk", value: info.shortcut || "", tab: "companion" })
+    if (info.last) out.push({ last: true, label: info.last.text || "…", value: [info.last.when, info.last.length].filter(function(s) { return s }).join(" · "), tab: "conversations" })
+    out.push({ icon: "󰆼", label: "Conversations", value: info.talks !== undefined ? String(info.talks) : "", tab: "conversations", chevron: true })
+    out.push({ icon: "󰒓", label: "Settings", value: "", tab: "companion", chevron: true })
     return out
   }
 
-  function run(cmd) { if (bar) bar.run(cmd) }
-  function tap() { if (running) run("omarum tap") }
+  function tap() { if (running) engine.send("tap") }
+  function openSettings(tab) { engine.openSettings(tab); root.close() }
   function activate() {
     if (cursor < 0) { tap(); return }
     var r = rows[cursor]
     if (!r) return
-    run(r.cmd)
-    if (r.cmd.indexOf("omarum settings") === 0) root.close()
+    if (r.tab) openSettings(r.tab)
+    else if (r.cmd === "install-uv") Quickshell.execDetached(["omarchy-launch-floating-terminal-with-presentation", "omarchy pkg add uv"])
+    else if (r.cmd === "retry") engine.retry()
   }
   function move(dy) {
     cursorActive = true
     var top = running ? -1 : 0
     cursor = Math.max(top, Math.min(rows.length - 1, cursor + dy))
   }
-  function refresh() { if (!summary.running) summary.running = true }
+  function refresh() { engine.refreshInfo() }
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
@@ -82,8 +85,7 @@ Panel {
     refresh()
     Qt.callLater(function() { if (panel.loadedContent) panel.loadedContent.forceActiveFocus() })
   }
-  onStateChanged: if (state === "idle" || state === "closed" || state === "off") refresh()
-  Component.onCompleted: refresh()
+  Engine { id: engine }
 
   ShellIpc {
     target: root.ipcTarget
@@ -92,35 +94,10 @@ Panel {
     function toggle(): void { root.toggle() }
     function refresh(): string { root.refresh(); return "ok" }
     function status(): string { return root.state }
+    function tap(): void { root.tap() }
+    function talkDown(): void { engine.send("ptt_down") }
+    function talkUp(): void { engine.send("ptt_up") }
   }
-
-  // Rum's state, one JSON line per change; "off" while the daemon is down.
-  Process {
-    id: watcher
-    command: ["omarum", "watch"]
-    running: true
-    stdout: SplitParser {
-      onRead: data => {
-        try {
-          var msg = JSON.parse(data)
-          root.state = msg.state || "off"
-          root.reason = String(msg.reason || "").slice(0, 160)
-        } catch (e) {}
-      }
-    }
-    onExited: { root.state = "off"; root.reason = ""; restartWatch.restart() }
-  }
-  Timer { id: restartWatch; interval: 3000; onTriggered: watcher.running = true }
-
-  // What the panel shows (names, engine, last conversation, the orb's colors).
-  Process {
-    id: summary
-    command: ["omarum", "summary"]
-    stdout: SplitParser {
-      onRead: data => { try { root.info = JSON.parse(data) } catch (e) {} }
-    }
-  }
-  Timer { interval: 60000; repeat: true; running: true; onTriggered: root.refresh() }
 
   // A voice-like pulse while someone talks (the bar has no audio levels).
   Timer {
@@ -155,7 +132,7 @@ Panel {
     }
     onPressed: function(code) {
       if (code === Qt.RightButton) root.tap()
-      else if (code === Qt.MiddleButton) root.run("omarum settings")
+      else if (code === Qt.MiddleButton) root.openSettings("")
       else root.toggle()
     }
   }
@@ -182,7 +159,7 @@ Panel {
       onTabRequested: function(direction) { root.switchPanel(direction) }
       onTextKey: function(t) {
         if (t === " " || t === "h" || t === "H") root.tap()
-        else if (t === "s" || t === "S") { root.run("omarum settings"); root.close() }
+        else if (t === "s" || t === "S") root.openSettings("")
       }
 
       Column {
@@ -200,7 +177,7 @@ Panel {
             id: hero
             width: parent.width
             title: root.name
-            meta: root.labels[root.state] || root.state
+            meta: root.settingUp ? (engine.phase === "setup" ? "setting up" : "starting") : (engine.phase === "needs-uv" || engine.phase === "failed" ? "needs attention" : (root.labels[root.state] || root.state))
             foreground: root.foreground
             fontFamily: root.fontFamily
             iconComponent: Component {
@@ -234,11 +211,11 @@ Panel {
         }
 
         Text {
-          visible: root.state === "error" && root.reason !== ""
+          visible: root.reason !== "" && (root.state === "error" || engine.phase !== "running")
           width: parent.width
           textFormat: Text.PlainText
           text: root.reason
-          color: bar ? bar.urgent : Commons.Color.urgent
+          color: root.settingUp ? root.dim : (bar ? bar.urgent : Commons.Color.urgent)
           font.family: root.fontFamily
           font.pixelSize: Style.font.bodySmall
           wrapMode: Text.WordWrap
