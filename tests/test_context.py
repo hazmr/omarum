@@ -74,3 +74,17 @@ def test_earlier_today_is_capped(tmp_path):
     (d / "transcript.jsonl").write_text("".join(f'{{"who":"user","text":"line {i}"}}\n' for i in range(100)))
     p = build_system_prompt(Config(user_name="Sam"), s, NOW)
     assert "line 99" in p and "line 59" not in p  # only the last 40 lines
+
+
+def test_code_explaining_guidance_only_when_awareness_is_on(tmp_path):
+    from datetime import datetime
+
+    from omarum.config import Config
+    from omarum.context import build_system_prompt
+    from omarum.store import Store
+
+    store = Store(tmp_path)
+    store.ensure()
+    on = build_system_prompt(Config(screen_awareness=True), store, datetime(2026, 11, 19, 20, 0))
+    off = build_system_prompt(Config(screen_awareness=False), store, datetime(2026, 11, 19, 20, 0))
+    assert "## Code on their screen" in on and "## Code on their screen" not in off

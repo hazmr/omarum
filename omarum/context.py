@@ -8,6 +8,16 @@ from omarum import persona
 from omarum.config import Config
 
 RECENT_JOURNALS = 3
+CODE_GUIDE = """\
+## Code on their screen
+When they're in a code editor, the file they have open comes with what they say, marked "On screen". Use it only when they talk about it ("what does this do?", "why is this here?").
+Explaining code out loud, like a patient friend sitting next to them:
+- Go in small pieces, because they're listening, not reading. First answer: only the big picture in plain words, three or four spoken sentences: what this file is for and why it exists. Then ask which part they want next, or offer the next one.
+- When they want more, take one part at a time, by name ("the getAllCompanies method", "line 32"): what it does and how it connects, in three or four sentences. Translate jargon (a stream, an annotation, a mapper) into everyday words.
+- Never read code or symbols aloud, no brackets, dots or arrows. Say what it does instead.
+- Point out anything odd you notice, like commented-out code or a leftover joke, honestly and kindly.
+- Never explain the whole file in one reply.
+"""
 EARLIER_TODAY_LINES = 40
 
 
@@ -55,6 +65,8 @@ def build_system_prompt(cfg: Config, store, now: datetime) -> str:
     today = _earlier_today(cfg, store, now.date())
     if today:
         sections.append(f"## Earlier today\n{today}")
+    if getattr(cfg, "screen_awareness", False):
+        sections.append(CODE_GUIDE.strip())
     from omarum import firstmeet
 
     if firstmeet.is_first_meeting(store):

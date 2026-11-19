@@ -23,6 +23,7 @@ from pipecat.transports.local.audio import LocalAudioTransport, LocalAudioTransp
 from omarum.context import build_system_prompt
 from omarum.store import Store
 from omarum import brains
+from omarum.screenctx import ScreenContext
 from omarum.config import Config
 from omarum.levels import LatencyClock, StateTap
 from omarum.micgate import Breaker, MicGate
@@ -99,6 +100,7 @@ def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, C
         TranscriptTap(session.transcript, "user"),
         aggregators.user(),
         breaker,
+        *([ScreenContext()] if cfg.screen_awareness else []),  # the code on screen goes with what you said
         llm,
         TranscriptTap(session.transcript, "companion"),
         tts,
