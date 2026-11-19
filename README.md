@@ -28,7 +28,7 @@ omarchy plugin add https://github.com/hazmr/omarum
 
 Requirements: Omarchy, [uv](https://docs.astral.sh/uv/) (`omarchy pkg add uv`), and a brain you're logged into or have a key for (the `claude` CLI is the default). The first load sets up Rum's Python environment in `~/.local/share/omarum/venv` and downloads the models it needs (Whisper base.en, Kokoro); the panel shows the progress. After that Rum starts with the Omarchy shell and restarts itself after a crash.
 
-- **Talk:** hold Ctrl+Shift+Space to talk, tap it for hands-free (change it in settings). The plugin binds the key itself while it's loaded.
+- **Talk:** keep Ctrl+Shift down and use Space. **Tap tap**: open or close the conversation. **Hold**: your turn; Rum waits however long you pause and answers when you let go. **Tap**: stop Rum talking, instantly. (Change the keys in settings; the plugin binds them itself while it's loaded.)
 - **Bar:** click the orb for the panel (hands-free, the brain, your last conversation, settings); right-click toggles hands-free; middle-click opens settings.
 - **Remove:** `omarchy plugin remove omarum.panel` stops Rum, the orb and the shortcut. Your conversations, memory and settings stay in `~/.local/share/omarum` and `~/.config/omarum`; delete those folders to remove them too.
 

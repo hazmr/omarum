@@ -38,3 +38,29 @@ def test_mute_can_be_disabled_for_echo_cancelled_setups():
     from omarum.turns import mute_strategies
 
     assert mute_strategies(Config(mute_while_speaking=False)) == []
+
+
+async def test_rum_waits_while_you_hold_and_answers_on_release():
+    from pipecat.turns.user_stop.base_user_turn_stop_strategy import BaseUserTurnStopStrategy
+
+    from omarum.turns import HoldMixin
+
+    class Strategy(HoldMixin, BaseUserTurnStopStrategy):
+        pass
+
+    s = Strategy()
+    fired = []
+
+    @s.event_handler("on_user_turn_stopped")
+    async def _stopped(_s, _params):
+        fired.append(1)
+
+    s.hold()
+    await s.report_user_turn_stopped()  # the smart-turn model thinks you're done: not while held
+    assert fired == []
+    await s.release()                   # you let go: the held-back decision goes out now
+    assert fired == [1]
+    await s.release()                   # nothing pending: nothing more
+    assert fired == [1]
+    await s.report_user_turn_stopped()  # not held: works as before
+    assert fired == [1, 1]

@@ -374,31 +374,54 @@ class GateFactory(FakeFactory):
         return task, stop, self.session
 
 
+class FakeHold:
+    def __init__(self):
+        self.events = []
+
+    def hold(self):
+        self.events.append("hold")
+
+    async def release(self):
+        self.events.append("release")
+
+
 async def test_ptt_hold_starts_session_and_release_closes_mic(monkeypatch):
+    """Hold Space while closed: Rum opens, your turn lasts until you let go."""
     clock = [0.0]
     monkeypatch.setattr("omarum.daemon.time.monotonic", lambda: clock[0])
     f = GateFactory()
     d = make(f)
     await d.handle({"cmd": "ptt_down"})
-    assert f.starts == 1 and f.gate.is_open
+    assert f.starts == 0  # could still be a tap
+    clock[0] = 0.4  # (the clock is faked, so fire the daemon's hold timer by hand)
+    await d._ptt_act(d._ptt.tick(clock[0]))  # still down: it's a hold
+    assert f.starts == 1 and f.gate.is_open and d._holding
+    f.session.turn_hold = hold = FakeHold()
     clock[0] = 2.0
     await d.handle({"cmd": "ptt_up"})
-    assert not f.gate.is_open and d.state == "listening"
+    assert not f.gate.is_open and d.state == "listening" and hold.events == ["release"]
 
 
 async def test_ptt_tap_hands_free_then_tap_closes(monkeypatch):
+    """Double tap opens hands-free; a single tap doesn't close it; a double tap does."""
     clock = [0.0]
     monkeypatch.setattr("omarum.daemon.time.monotonic", lambda: clock[0])
     f = GateFactory()
     d = make(f)
-    await d.handle({"cmd": "ptt_down"})
-    clock[0] = 0.1
-    await d.handle({"cmd": "ptt_up"})
-    assert f.gate.is_open  # hands-free: mic stays open
-    clock[0] = 5.0
-    await d.handle({"cmd": "ptt_down"})
-    clock[0] = 5.1
-    await d.handle({"cmd": "ptt_up"})
+
+    async def tap(t):
+        clock[0] = t
+        await d.handle({"cmd": "ptt_down"})
+        clock[0] = t + 0.08
+        await d.handle({"cmd": "ptt_up"})
+
+    await tap(0.0)
+    assert f.starts == 0  # a single tap while closed does nothing
+    await tap(0.3)
+    assert f.starts == 1 and f.gate.is_open and d._ptt.mode == "hands_free"
+    await tap(5.0)
+    assert d.state == "listening" and f.stops == 0  # one tap: just "stop talking"
+    await tap(5.3)
     assert d.state == "closed" and f.stops == 1
 
 
@@ -495,7 +518,10 @@ async def test_quick_tap_over_one_connection_is_a_tap_even_while_starting():
         await down
 
     await tap()
+    await tap()  # a double tap, delivered while the first start is still loading
     assert d._ptt.mode == "hands_free"
+    await asyncio.sleep(0.7)
     assert d.state == "listening" and f.starts == 1
-    await tap()  # second tap closes
+    await tap()
+    await tap()  # double tap closes
     assert d.state == "closed"

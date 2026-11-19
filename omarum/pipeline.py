@@ -76,11 +76,15 @@ def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, C
     # The persona travels with the conversation, so API brains get it too; the CLI brains
     # skip system messages (they get the persona their own way).
     context = LLMContext(messages=[{"role": "system", "content": system_prompt}])
+    from omarum.turns import holdable_turn_stop
+
+    turn_hold = holdable_turn_stop()  # the talk key holds your turn open (daemon: hold_start/hold_end)
+    session.turn_hold = turn_hold
     aggregators = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
             vad_analyzer=SileroVADAnalyzer(params=vad_params(cfg)),
-            user_turn_strategies=turn_strategies(cfg),
+            user_turn_strategies=turn_strategies(cfg, stop=turn_hold),
             user_mute_strategies=mute_strategies(cfg),
         ),
     )

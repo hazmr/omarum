@@ -2,7 +2,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Hyprland
 
-// The talk shortcut, owned by the plugin: hold = talk, tap = hands-free.
+// The talk key, owned by the plugin (Ctrl+Shift stay down; Space is timed, see omarum/ptt.py):
+// tap tap = open/close · hold = your turn (Rum waits until you let go) · tap = stop Rum talking.
 // The key is bound at runtime (nothing written to ~/.config/hypr), bound again after
 // every Hyprland config reload, and unbound when the plugin unloads.
 Scope {
@@ -25,7 +26,7 @@ Scope {
     if (!keys) return
     eval_('local held = false\n'
       + 'hl.bind("' + keys + '", function() held = true; hl.dispatch(hl.dsp.global("omarum:talk-down")) end, '
-      + '{ description = "Talk to Rum (hold) / hands-free (tap)" })\n'
+      + '{ description = "Talk to Rum (hold) · open/close (tap tap) · stop Rum (tap)" })\n'
       + 'hl.bind("' + keys + '", function() if held then held = false; hl.dispatch(hl.dsp.global("omarum:talk-up")) end end, '
       + '{ description = "Talk to Rum: release", release = true, transparent = true, ignore_mods = true, non_consuming = true })')
     bound = keys

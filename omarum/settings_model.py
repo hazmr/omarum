@@ -49,8 +49,8 @@ ROWS: list[Row] = [
     Row("Companion", "Conversation", "Words needed to interrupt", "interrupt_min_words", "slider", (1, 6, 1, "")),
     Row("Companion", "Conversation", "Mute mic while talking", "mute_while_speaking", "toggle",
         hint="stops your companion hearing itself through the speakers"),
-    Row("Companion", "Shortcuts", "Talk (hold) / hands-free (tap)", "talk_shortcut", "shortcut",
-        hint="Enter, then press the new keys"),
+    Row("Companion", "Shortcuts", "Talk key", "talk_shortcut", "shortcut",
+        hint="tap tap: open/close · hold: your turn · tap: stop Rum   (Enter to change the keys)"),
     # Engine
     Row("Engine", "Voice", "Engine", "voice_primary", "seg", ("elevenlabs", "zonos3", "kokoro"),
         hint="falls back down this order if it fails"),

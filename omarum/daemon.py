@@ -63,6 +63,7 @@ class Daemon:
         self._executor = None
         self._ptt = PushToTalk()
         self._mic_open = True  # applied to the session's mic gate as soon as it exists
+        self._holding = False  # the talk key is down for a hold: Rum waits for the release
         self._audio_free_at = 0.0  # monotonic time when the last session's audio threads are done
 
     # -- events from the pipeline -------------------------------------------
@@ -166,14 +167,17 @@ class Daemon:
             case "status":
                 return self._reply()
             case "ptt_down":
+                from omarum.ptt import TAP_SECS
+
+                # Still down a moment from now? Then it's a hold (see PushToTalk.tick).
+                asyncio.get_running_loop().call_later(
+                    TAP_SECS + 0.02, lambda: asyncio.ensure_future(self._ptt_act(self._ptt.tick(time.monotonic()))))
                 return await self._ptt_act(self._ptt.press(
                     time.monotonic(), open_=self._active or self._starting, speaking=self.state == "speaking"))
-            case "tap":  # the bar button: a press and release of zero length
+            case "tap":  # the bar button and panel switch: hands-free on, or close
                 if self._starting:
                     return self._reply()
-                now = time.monotonic()
-                actions = self._ptt.press(now, open_=self._active, speaking=self.state == "speaking")
-                return await self._ptt_act(actions + self._ptt.release(now))
+                return await self._ptt_act(self._ptt.toggle(open_=self._active))
             case "ptt_up":
                 return await self._ptt_act(self._ptt.release(time.monotonic()))
             case "reload":
@@ -213,6 +217,16 @@ class Daemon:
                 self._set_mic(True)
             elif action == "mic_close":
                 self._set_mic(False)
+            elif action == "hold_start":  # your turn: Rum waits until the key comes up
+                self._holding = True
+                hold = getattr(self._recording, "turn_hold", None)
+                if hold is not None:
+                    hold.hold()
+            elif action == "hold_end":
+                self._holding = False
+                hold = getattr(self._recording, "turn_hold", None)
+                if hold is not None:
+                    await hold.release()
         return self._reply()
 
     async def _start(self) -> dict:
@@ -239,6 +253,9 @@ class Daemon:
         finally:
             self._starting = False
         self._set_mic(self._mic_open)  # a release that came while starting still counts
+        hold = getattr(self._recording, "turn_hold", None)
+        if self._holding and hold is not None:
+            hold.hold()  # the key went down (a hold) while Rum was still starting
         self._runner = asyncio.create_task(self._run(task, self._session))
         self._watchdog = asyncio.create_task(self._watch_idle())
         self._set_state("listening")
