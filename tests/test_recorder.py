@@ -61,3 +61,68 @@ async def test_companion_tap_joins_streamed_reply(tmp_path: Path):
         expected_down_frames=[LLMFullResponseStartFrame, LLMTextFrame, LLMTextFrame, LLMFullResponseEndFrame],
     )
     assert [(r["who"], r["text"]) for r in read_transcript(w.path)] == [("companion", "Hi there.")]
+
+
+import shutil
+import wave
+
+import pytest
+
+from omarum.config import Config
+from omarum.recorder import Session, compress_to_opus, write_wav
+from omarum.store import Store
+
+PCM = b"\x10\x00\xf0\xff" * 800  # 0.1 s of 16 kHz mono 16-bit
+
+
+def test_write_wav_roundtrip(tmp_path: Path):
+    p = tmp_path / "a.wav"
+    write_wav(p, PCM, 16000)
+    with wave.open(str(p)) as w:
+        assert w.getframerate() == 16000 and w.getnframes() == 1600 and w.getnchannels() == 1
+
+
+def test_compress_falls_back_without_ffmpeg(tmp_path: Path):
+    p = tmp_path / "a.wav"
+    write_wav(p, PCM, 16000)
+    assert compress_to_opus(p, ffmpeg=None) == p and p.exists()
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
+def test_compress_with_ffmpeg(tmp_path: Path):
+    p = tmp_path / "a.wav"
+    write_wav(p, PCM * 10, 16000)
+    out = compress_to_opus(p)
+    assert out.suffix == ".opus" and out.exists() and not p.exists()
+
+
+def _session(tmp_path: Path, **cfg) -> Session:
+    store = Store(tmp_path)
+    store.ensure()
+    return Session(store, Config(**cfg), datetime(2026, 11, 19, 21, 40))
+
+
+def test_empty_session_leaves_no_folder(tmp_path: Path):
+    s = _session(tmp_path)
+    s.add_audio(PCM, PCM, 16000)
+    assert s.close({}) is None
+    assert not s.dir.exists()
+
+
+def test_session_close_writes_meta_and_audio(tmp_path: Path):
+    s = _session(tmp_path)
+    s.transcript.add("user", "hello", datetime(2026, 11, 19, 21, 40, 3))
+    s.add_audio(PCM, PCM, 16000)
+    d = s.close({"voices": ["zonos3", "kokoro"], "latency_ms": [800]})
+    meta = json.loads((d / "meta.json").read_text())
+    assert meta["started"] == "2026-11-19T21:40:00" and "ended" in meta and meta["voices"] == ["zonos3", "kokoro"]
+    assert any(d.glob("user.*")) and any(d.glob("companion.*"))
+
+
+def test_record_audio_off_writes_no_audio(tmp_path: Path):
+    s = _session(tmp_path, record_audio=False)
+    s.transcript.add("user", "hello", datetime(2026, 11, 19, 21, 40, 3))
+    s.add_audio(PCM, PCM, 16000)
+    d = s.close({})
+    assert not any(d.glob("user.*")) and not any(d.glob("companion.*"))
+    assert (d / "transcript.jsonl").exists()

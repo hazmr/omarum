@@ -40,7 +40,7 @@ class FakeFactory:
             done.set()
 
         self.finish = done.set  # lets a test end the "pipeline" on its own
-        return done, stop
+        return done, stop, None
 
 
 async def fake_run(task):

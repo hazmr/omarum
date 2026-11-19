@@ -47,6 +47,7 @@ class Daemon:
         self._watchdog: asyncio.Task | None = None
         self._listening_since = time.monotonic()
         self._session = 0  # bumps on every start/end; stale sessions' events are dropped
+        self._recording = None  # the current conversation's Session (closed in phase 2 task 6)
         self._audio_free_at = 0.0  # monotonic time when the last session's audio threads are done
 
     # -- events from the pipeline -------------------------------------------
@@ -121,7 +122,7 @@ class Daemon:
                 await asyncio.sleep(wait)
             self._session += 1
             emit = self._emitter(self._session)
-            task, self._stop = await asyncio.to_thread(self._factory, self.cfg, emit)
+            task, self._stop, self._recording = await asyncio.to_thread(self._factory, self.cfg, emit)
         except Exception as exc:  # no mic, model load failure, ...
             logger.exception("could not start a session")
             self._set_state("error", str(exc))

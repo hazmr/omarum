@@ -10,6 +10,7 @@ from typing import Awaitable, Callable
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.pipeline.pipeline import Pipeline
+from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
@@ -24,17 +25,19 @@ from omarum.store import Store
 from omarum.claude_code_llm import ClaudeCodeLLMService
 from omarum.config import Config
 from omarum.levels import LatencyClock, StateTap
-from omarum.voices import build_tts, load_env_file
+from omarum.recorder import Session, TranscriptTap
+from omarum.voices import available_voices, build_tts, load_env_file, voice_chain
 from omarum.turns import mute_strategies, turn_strategies, vad_params
 from omarum.models import pick_whisper, resolve_whisper_model
 
 Emit = Callable[[dict], None]
 
 
-def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, Callable[[], Awaitable[None]]]:
+def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, Callable[[], Awaitable[None]], Session]:
     store = store or Store()
     store.ensure()
     clock = LatencyClock()
+    session = Session(store, cfg, datetime.now())
     transport = LocalAudioTransport(
         LocalAudioTransportParams(audio_in_enabled=True, audio_out_enabled=True)
     )
@@ -53,7 +56,15 @@ def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, C
         system_prompt=build_system_prompt(cfg, store, datetime.now()),
         on_error=lambda reason: emit({"type": "state", "state": "error", "reason": reason}),
     )
-    tts = build_tts(cfg, {**load_env_file(), **os.environ})
+    env = {**load_env_file(), **os.environ}
+    tts = build_tts(cfg, env)
+    recorder = AudioBufferProcessor(num_channels=1, auto_start_recording=True)
+
+    @recorder.event_handler("on_track_audio_data")
+    async def _keep_audio(_proc, user_audio, bot_audio, sample_rate, _channels):
+        session.add_audio(user_audio, bot_audio, sample_rate)
+
+    session.meta = {"brain_model": cfg.brain_model, "voices": voice_chain(cfg, available_voices(env)), "latency_ms": clock.samples}
     context = LLMContext()
     aggregators = LLMContextAggregatorPair(
         context,
@@ -67,11 +78,14 @@ def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, C
         transport.input(),
         StateTap(emit, "user", clock),
         stt,
+        TranscriptTap(session.transcript, "user"),
         aggregators.user(),
         llm,
+        TranscriptTap(session.transcript, "companion"),
         tts,
         StateTap(emit, "companion", clock),
         transport.output(),
+        recorder,
         aggregators.assistant(),
     ])
     task = PipelineTask(pipeline, params=PipelineParams(enable_metrics=False))
@@ -80,7 +94,7 @@ def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, C
         # Cancel, don't EndFrame: an EndFrame waits for queued speech to finish playing.
         await task.cancel(reason="closed by user")
 
-    return task, stop
+    return task, stop, session
 
 
 async def _main() -> None:
@@ -93,7 +107,7 @@ async def _main() -> None:
         if msg["type"] != "level":
             print(msg, flush=True)
 
-    task, _ = build_pipeline(load_config(), emit)
+    task, _, _ = build_pipeline(load_config(), emit)
     emit({"type": "state", "state": "listening"})
     await PipelineRunner(handle_sigint=True).run(task)
 

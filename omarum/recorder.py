@@ -80,3 +80,69 @@ class TranscriptTap(FrameProcessor):
             elif isinstance(frame, (LLMFullResponseEndFrame, InterruptionFrame)):
                 self._flush_reply()  # an interrupted reply is still recorded, as far as it got
         await self.push_frame(frame, direction)
+
+
+def write_wav(path: Path, pcm16: bytes, sample_rate: int) -> None:
+    import wave
+
+    with wave.open(str(path), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(sample_rate)
+        w.writeframes(pcm16)
+
+
+def compress_to_opus(wav: Path, ffmpeg: str | None = "auto") -> Path:
+    """WAV -> Opus (24 kbps speech). Keeps the WAV if ffmpeg is missing or fails."""
+    import shutil
+    import subprocess
+
+    if ffmpeg == "auto":
+        ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        return wav
+    out = wav.with_suffix(".opus")
+    try:
+        subprocess.run(
+            [ffmpeg, "-y", "-loglevel", "error", "-i", str(wav), "-c:a", "libopus", "-b:a", "24k", str(out)],
+            check=True, timeout=300,
+        )
+    except (OSError, subprocess.SubprocessError):
+        out.unlink(missing_ok=True)
+        return wav
+    wav.unlink(missing_ok=True)
+    return out
+
+
+class Session:
+    """One conversation's folder: transcript as it happens, audio and meta when it ends."""
+
+    def __init__(self, store, cfg, started: datetime) -> None:
+        self.cfg = cfg
+        self.started = started
+        self.dir = store.new_conversation(started)
+        self.transcript = TranscriptWriter(self.dir / "transcript.jsonl")
+        self._audio: tuple[bytes, bytes, int] | None = None
+        self.meta: dict = {}  # filled in by the pipeline (brain, voices, latencies)
+
+    def add_audio(self, user_pcm: bytes, companion_pcm: bytes, sample_rate: int) -> None:
+        self._audio = (user_pcm, companion_pcm, sample_rate)
+
+    def close(self, meta: dict) -> Path | None:
+        """Write audio + meta.json; a conversation where nobody said anything leaves no folder."""
+        import shutil
+
+        if self.transcript.lines == 0:
+            shutil.rmtree(self.dir, ignore_errors=True)
+            return None
+        if self.cfg.record_audio and self._audio:
+            user, companion, rate = self._audio
+            for name, pcm in (("user", user), ("companion", companion)):
+                if pcm:
+                    wav = self.dir / f"{name}.wav"
+                    write_wav(wav, pcm, rate)
+                    compress_to_opus(wav)
+        record = {"started": self.started.isoformat(timespec="seconds"),
+                  "ended": datetime.now().isoformat(timespec="seconds"), **meta}
+        (self.dir / "meta.json").write_text(json.dumps(record, indent=2))
+        return self.dir
