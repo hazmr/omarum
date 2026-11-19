@@ -69,3 +69,15 @@ def test_unknown_colors_use_theme(monkeypatch):
     monkeypatch.setattr(theme, "load_palette", lambda *a, **k: {"sentinel": True})
     assert theme.palette_for("neon") == {"sentinel": True}
     assert theme.palette_for("theme") == {"sentinel": True}
+
+
+def test_ui_colors_from_theme(tmp_path):
+    (tmp_path / "colors.toml").write_text('background = "#101010"\nforeground = "#eeeeee"\naccent = "#ff0000"\n')
+    c = theme.ui_colors(theme_dir=tmp_path)
+    assert c["background"] == "#101010" and c["accent"] == "#ff0000"
+    assert c["muted"] == theme.UI_FALLBACK["muted"]  # missing keys fall back
+
+
+def test_ui_colors_reject_bad_values(tmp_path):
+    (tmp_path / "colors.toml").write_text('background = "red; }"\n')
+    assert theme.ui_colors(theme_dir=tmp_path)["background"] == theme.UI_FALLBACK["background"]

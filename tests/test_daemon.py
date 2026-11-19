@@ -341,3 +341,13 @@ def test_cli_reload_command(monkeypatch, capsys):
     with pytest.raises(SystemExit):
         cli.main(["reload"])
     assert seen == {"cmd": "reload", "timeout": 2.0}
+
+
+async def test_reload_rereads_config(tmp_path, monkeypatch):
+    p = tmp_path / "config.toml"
+    p.write_text('brain_model = "sonnet"\n')
+    monkeypatch.setattr("omarum.config.CONFIG_PATH", p)
+    d = make(FakeFactory())
+    assert d.cfg.brain_model == "haiku"
+    await d.handle({"cmd": "reload"})
+    assert d.cfg.brain_model == "sonnet"

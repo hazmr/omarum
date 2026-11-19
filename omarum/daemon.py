@@ -145,6 +145,9 @@ class Daemon:
             case "status":
                 return self._reply()
             case "reload":
+                from omarum.config import load_config
+
+                self.cfg = load_config()  # the next conversation uses the new settings
                 self.hub.broadcast({"type": "reload"})  # the orb re-reads config and theme
                 return self._reply()
             case "start":

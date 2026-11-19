@@ -11,8 +11,15 @@ from omarum.ipc import SOCKET_PATH, DaemonNotRunning, send_command
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="omarum", description="Talk to Rum.")
-    parser.add_argument("command", choices=["daemon", "toggle", "start", "stop", "status", "reload"])
+    parser.add_argument("command", choices=["daemon", "toggle", "start", "stop", "status", "reload", "settings"])
     args = parser.parse_args(argv)
+
+    if args.command == "settings":
+        import os
+        from pathlib import Path
+
+        launcher = Path(__file__).resolve().parent.parent / "bin" / "omarum-settings"
+        os.execv(str(launcher), [str(launcher)])
 
     if args.command == "daemon":
         from omarum.daemon import run_daemon

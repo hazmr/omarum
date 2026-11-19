@@ -99,3 +99,26 @@ PRESETS: dict[str, dict[str, RGB]] = {
 def palette_for(colors: str) -> dict[str, RGB]:
     """'theme' (live Omarchy palette) or a built-in preset; anything unknown follows the theme."""
     return dict(PRESETS[colors]) if colors in PRESETS else load_palette()
+
+
+UI_FALLBACK = {
+    "background": "#0c0b0c", "foreground": "#fafcfb", "accent": "#b59790", "muted": "#584e51",
+    "light_foreground": "#cfd3cd", "selection": "#584e51",
+}
+
+
+def ui_colors(theme_dir: Path | None = None) -> dict[str, str]:
+    """Hex strings for the settings window (only valid #rrggbb values are used, so CSS stays safe)."""
+    import re
+
+    colors = dict(UI_FALLBACK)
+    theme_dir = theme_dir or _current_theme_dir()
+    try:
+        data = tomllib.loads((theme_dir / "colors.toml").read_text()) if theme_dir else {}
+    except (OSError, tomllib.TOMLDecodeError):
+        data = {}
+    for key in colors:
+        value = data.get(key)
+        if isinstance(value, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", value.strip()):
+            colors[key] = value.strip().lower()
+    return colors
