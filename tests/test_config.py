@@ -4,10 +4,10 @@ from omarum.config import load_config
 
 
 def test_defaults_when_file_missing(tmp_path: Path, monkeypatch):
-    monkeypatch.setenv("USER", "hazem")
+    monkeypatch.setenv("USER", "sam")
     cfg = load_config(tmp_path / "nope.toml")
     assert cfg.companion_name == "Rum"
-    assert cfg.user_name == "Hazem"
+    assert cfg.user_name == "Sam"
     assert cfg.brain_model == "haiku"
     assert cfg.vad_stop_secs == 0.3
     assert cfg.idle_timeout_secs == 8.0

@@ -41,7 +41,7 @@
 **Interfaces:**
 - Produces: `@dataclass Config(companion_name: str, user_name: str, brain_model: str, whisper_model: str, whisper_device: str, piper_voice: str, vad_stop_secs: float, idle_timeout_secs: float, orb_position: str)` and `load_config(path: Path | None = None) -> Config`. Defaults: `"Rum"`, `os.environ["USER"].capitalize()`, `"haiku"`, `"large-v3-turbo"`, `"cuda"`, `"en_US-amy-medium"`, `0.6`, `8.0`, `"top-right"`. Missing file → all defaults; unknown keys are ignored.
 
-- [ ] **Step 1:** `git init` in `/home/hazem/Work/omarum`; `uv init --package --name omarum --python 3.12`; `uv add "pipecat-ai[silero,whisper,piper,local]"`; `uv add --dev pytest pytest-asyncio`. Pin the installed pipecat version exactly in `pyproject.toml`.
+- [ ] **Step 1:** `git init` in the project folder; `uv init --package --name omarum --python 3.12`; `uv add "pipecat-ai[silero,whisper,piper,local]"`; `uv add --dev pytest pytest-asyncio`. Pin the installed pipecat version exactly in `pyproject.toml`.
 - [ ] **Step 2: Write failing tests:** `test_defaults_when_file_missing` (`companion_name == "Rum"`, `vad_stop_secs == 0.6`, `idle_timeout_secs == 8.0`); `test_file_overrides` (tmp TOML `companion_name = "Noa"` → `"Noa"`, others default); `test_unknown_keys_ignored`.
 - [ ] **Step 3:** `uv run pytest tests/test_config.py -v` → FAIL (import error).
 - [ ] **Step 4:** Implement `load_config` with `tomllib`.

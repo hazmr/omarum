@@ -14,7 +14,7 @@ Rum is **gender-neutral by default**. Each user chooses the companion's name
 (default "Rum") and a female or male voice. This document refers to the
 companion as "Rum."
 
-Why it matters to the owner (Hazem):
+Why it matters to the owner:
 - A companion that **stays the same person** no matter which AI powers it.
   Rum's identity, memory and voice live on the user's machine, not with a provider.
 - It **knows you over time**: it remembers yesterday, your projects and how you like to work.
