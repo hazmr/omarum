@@ -140,3 +140,13 @@ def test_wait_before_answering_is_a_setting():
     assert Config().vad_stop_secs == 0.8  # a breath or "hmm" no longer ends your turn
     assert display(r, 0.8) == "0.8s"
     assert step(r, 0.8, +1) == 0.9 and step(r, 2.0, +1) == 2.0 and step(r, 0.3, -1) == 0.3
+
+
+def test_elevenlabs_key_sits_right_under_the_voice_engine():
+    from omarum.settings_model import rows_for
+
+    voice = [r for r in rows_for("Engine") if r.group == "Voice"]
+    assert [r.label for r in voice][:2] == ["Engine", "ElevenLabs API key"]
+    key = voice[1]
+    assert key.kind == "secret" and key.key == "ELEVENLABS_API_KEY"
+    assert "Enter" in key.hint and "paste" in key.hint

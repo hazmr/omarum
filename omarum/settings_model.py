@@ -53,12 +53,13 @@ ROWS: list[Row] = [
     # Engine
     Row("Engine", "Voice", "Engine", "voice_primary", "seg", ("elevenlabs", "zonos3", "kokoro"),
         hint="falls back down this order if it fails"),
+    Row("Engine", "Voice", "ElevenLabs API key", "ELEVENLABS_API_KEY", "secret",
+        hint="Enter, paste your key, Enter · from elevenlabs.io → Profile → API keys"),
     Row("Engine", "Voice", "ZONOS3 voice", "zonos3_voice", "cycle",
         ("Savannah", "Willow", "Imogen", "Wyatt", "Rupert", "Cillian", "Jett")),
     Row("Engine", "Voice", "Kokoro voice", "kokoro_voice", "cycle",
         ("af_heart", "af_bella", "af_nicole", "bf_emma", "am_michael", "bm_george")),
     Row("Engine", "Voice", "Voice volume", "voice_volume", "slider", (50, 300, 10, "%")),
-    Row("Engine", "Voice", "ElevenLabs key", "ELEVENLABS_API_KEY", "secret", hint="Enter to set, empty to remove"),
     Row("Engine", "Ears", "Whisper device", "whisper_device", "seg", ("auto", "cuda", "cpu")),
     # Memory
     Row("Memory", "Privacy", "Save recording audio", "record_audio", "toggle"),

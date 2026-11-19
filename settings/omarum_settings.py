@@ -123,7 +123,11 @@ class Settings(Gtk.ApplicationWindow):
             if r.group != group:
                 group = r.group
                 items.append(Item("group", group))
-            items.append(Item("setting", r.label, r, hint=r.hint))
+            hint = r.hint
+            if r.key == "voice_primary" and self.values.get("voice_primary") == "elevenlabs" \
+                    and not has_secret("ELEVENLABS_API_KEY"):
+                hint = "⚠ no ElevenLabs API key yet: add it on the next line (until then Rum uses ZONOS3)"
+            items.append(Item("setting", r.label, r, hint=hint))
         if tab == "Engine":
             items.append(Item("group", "Status"))
             for label, ok, detail in self.status():
