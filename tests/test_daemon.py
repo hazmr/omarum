@@ -403,7 +403,7 @@ async def test_ptt_hold_starts_session_and_release_closes_mic(monkeypatch):
 
 
 async def test_ptt_tap_hands_free_then_tap_closes(monkeypatch):
-    """Double tap opens hands-free; a single tap doesn't close it; a double tap does."""
+    """Walkie-talkie: quick taps never open or close Rum; only holding opens her."""
     clock = [0.0]
     monkeypatch.setattr("omarum.daemon.time.monotonic", lambda: clock[0])
     f = GateFactory()
@@ -416,14 +416,18 @@ async def test_ptt_tap_hands_free_then_tap_closes(monkeypatch):
         await d.handle({"cmd": "ptt_up"})
 
     await tap(0.0)
-    assert f.starts == 0  # a single tap while closed does nothing
     await tap(0.3)
-    assert f.starts == 1 and f.gate.is_open and d._ptt.mode == "hands_free"
+    assert f.starts == 0  # taps while closed: nothing
+    clock[0] = 1.0
+    await d.handle({"cmd": "ptt_down"})
+    clock[0] = 1.4
+    await d._ptt_act(d._ptt.tick(clock[0]))  # held: Rum opens for your turn
+    clock[0] = 3.0
+    await d.handle({"cmd": "ptt_up"})
+    assert f.starts == 1 and d.state == "listening"
     await tap(5.0)
-    assert d.state == "listening" and f.stops == 0  # one tap: just "stop talking"
     await tap(5.3)
-    assert d.state == "closed" and f.stops == 1
-
+    assert d.state == "listening" and f.stops == 0  # the key never closes her
 
 async def test_ptt_hold_interrupts_rum(monkeypatch):
     clock = [0.0]
@@ -506,22 +510,17 @@ async def test_brain_without_key_errors_with_reason(monkeypatch):
 
 
 async def test_quick_tap_over_one_connection_is_a_tap_even_while_starting():
-    """The plugin sends press and release on one socket, handled in order; a slow start
-    must not make the release look late (a tap turning into a hold)."""
+    """The plugin sends press and release on one socket; quick taps must stay taps (nothing opens)."""
     f = FakeFactory(build_delay=0.6)
     d = make(f)
 
     async def tap():  # how the socket server delivers them: each command its own task, in order
         down = asyncio.create_task(d.handle({"cmd": "ptt_down"}))
         await asyncio.sleep(0)
-        await d.handle({"cmd": "ptt_up"})  # sent ~instantly after the press
+        await d.handle({"cmd": "ptt_up"})
         await down
 
     await tap()
-    await tap()  # a double tap, delivered while the first start is still loading
-    assert d._ptt.mode == "hands_free"
-    await asyncio.sleep(0.7)
-    assert d.state == "listening" and f.starts == 1
     await tap()
-    await tap()  # double tap closes
-    assert d.state == "closed"
+    await asyncio.sleep(0.5)  # past the hold timer: still nothing, because the key came up at once
+    assert f.starts == 0 and d._ptt.mode == "closed"
