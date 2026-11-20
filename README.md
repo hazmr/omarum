@@ -37,15 +37,11 @@ The first time it loads, Omarum sets up its Python environment and downloads the
 
 ## Talking to Rum
 
-Keep **Ctrl + Shift** held down, and use **Space**:
+**Ctrl + Shift + Space is a walkie-talkie:** hold it and talk, let go and Rum answers. Holding it while Rum is talking stops her, and it's your turn. A quick tap does nothing, so she never opens by accident.
 
-| Space | What happens |
-|---|---|
-| **Tap tap** | Open the conversation (hands-free), or close it |
-| **Hold** | Your turn: talk and pause as long as you like; Rum answers when you let go |
-| **Tap** | Stop Rum talking, right away |
+**To close Rum, just say goodbye:** "bye", "good night", "that's all", "talk to you later". She answers with a short goodbye and closes. A conversation also closes by itself after a few seconds of silence.
 
-A single tap while Rum is closed does nothing, so it never opens by accident. A conversation also closes by itself after 8 seconds of silence.
+**Hands-free** (talk without holding a key): right-click the orb in the bar, or use the switch in its panel.
 
 **The orb in the bar:**
 - **Click:** the panel (hands-free switch, your brain and voice, your last conversation, settings).
@@ -94,7 +90,8 @@ This stops Rum, the orb and the shortcut. Your conversations, memory and setting
 
 - **Rum doesn't answer, or the panel shows a red message:** the message says why, for example "Codex is not logged in. Run: codex login" or "Gemini needs an API key".
 - **Rum can't see your code:** the editor must be the focused window when you speak, and the project should be one IntelliJ knows (or live in `~/Projects`, `~/IdeaProjects` or `~/Work`).
-- **Rum interrupts you:** raise **Wait before answering** in settings → Companion, or hold Space while you talk.
+- **Rum interrupts you:** hold Ctrl+Shift+Space while you talk (she waits until you let go), or set **Response speed** to *patient* in settings → Companion.
+- **Rum takes long to answer:** set **Response speed** to *fast* in settings → Companion, or the brain's **Model** to `haiku` in settings → Engine.
 - **Logs:** `~/.local/state/omarum/daemon.log`
 
 ## Development

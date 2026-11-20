@@ -524,3 +524,26 @@ async def test_quick_tap_over_one_connection_is_a_tap_even_while_starting():
     await tap()
     await asyncio.sleep(0.5)  # past the hold timer: still nothing, because the key came up at once
     assert f.starts == 0 and d._ptt.mode == "closed"
+
+
+async def test_saying_bye_closes_rum_after_her_goodbye():
+    f = FakeFactory()
+    d = make(f)
+    await d.handle({"cmd": "toggle"})
+    assert d.state == "listening"
+    d.on_event({"type": "farewell"})
+    d.on_event({"type": "state", "state": "speaking"})   # Rum: "Night, Haz!"
+    assert d.state == "speaking"
+    d.on_event({"type": "state", "state": "listening"})  # her goodbye is done
+    await asyncio.sleep(1.2)
+    assert d.state == "closed" and f.stops == 1
+
+
+async def test_bye_closes_even_if_rum_says_nothing():
+    f = FakeFactory()
+    d = make(f)
+    await d.handle({"cmd": "toggle"})
+    d.on_event({"type": "farewell"})
+    d._farewell_at -= 11  # ten seconds pass without a reply
+    await asyncio.sleep(0.3)
+    assert d.state == "closed"

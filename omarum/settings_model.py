@@ -56,7 +56,7 @@ ROWS: list[Row] = [
     Row("Companion", "Awareness", "See the code you're looking at", "screen_awareness", "toggle",
         hint="when you talk with IntelliJ or VS Code focused, Rum reads that file (sent to your brain)"),
     Row("Companion", "Shortcuts", "Talk key", "talk_shortcut", "shortcut",
-        hint="tap tap: open/close · hold: your turn · tap: stop Rum   (Enter to change the keys)"),
+        hint="hold to talk, let go and Rum answers · say \"bye\" to close   (Enter to change the keys)"),
     # Engine
     Row("Engine", "Voice", "Engine", "voice_primary", "seg", ("elevenlabs", "zonos3", "kokoro"),
         hint="falls back down this order if it fails"),

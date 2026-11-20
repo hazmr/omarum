@@ -23,6 +23,7 @@ from pipecat.transports.local.audio import LocalAudioTransport, LocalAudioTransp
 from omarum.context import build_system_prompt
 from omarum.store import Store
 from omarum import brains
+from omarum.farewelltap import FarewellTap
 from omarum.screenctx import ScreenContext
 from omarum.config import Config
 from omarum.levels import LatencyClock, StateTap
@@ -103,6 +104,7 @@ def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, C
         StateTap(emit, "user", clock),
         stt,
         TranscriptTap(session.transcript, "user"),
+        FarewellTap(emit),  # "bye", "good night": Rum says goodbye, then closes
         aggregators.user(),
         breaker,
         # The code on screen, and a screenshot when you ask Rum to look, go with what you said.

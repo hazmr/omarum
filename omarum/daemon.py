@@ -64,6 +64,8 @@ class Daemon:
         self._ptt = PushToTalk()
         self._mic_open = True  # applied to the session's mic gate as soon as it exists
         self._holding = False  # the talk key is down for a hold: Rum waits for the release
+        self._farewell_at = 0.0  # when they said goodbye in this conversation (0 = not yet)
+        self._farewell_spoke = False
         self._audio_free_at = 0.0  # monotonic time when the last session's audio threads are done
 
     # -- events from the pipeline -------------------------------------------
@@ -75,6 +77,11 @@ class Daemon:
         return emit
 
     def on_event(self, msg: dict) -> None:
+        if msg.get("type") == "farewell":  # they said goodbye: close once Rum has said hers
+            self._farewell_at, self._farewell_spoke = time.monotonic(), False
+            return
+        if msg.get("type") == "state" and msg.get("state") == "speaking" and self._farewell_at:
+            self._farewell_spoke = True
         if msg.get("type") == "state":
             new = msg["state"]
             if new == "listening" and self.state == "user_speaking":
@@ -287,6 +294,11 @@ class Daemon:
         while self._active:
             await asyncio.sleep(0.05)
             idle = time.monotonic() - self._listening_since
+            if self._farewell_at and (
+                    (self._farewell_spoke and self.state == "listening" and idle > 0.6)
+                    or time.monotonic() - self._farewell_at > 10):
+                await self._end()  # goodbye said (or no reply came): close
+                return
             if self.state == "listening" and idle > self.cfg.idle_timeout_secs:
                 await self._end()
                 return
@@ -303,6 +315,7 @@ class Daemon:
         except asyncio.TimeoutError:
             runner.cancel()
         self._audio_free_at = time.monotonic() + self.cfg.audio_release_secs
+        self._farewell_at, self._farewell_spoke = 0.0, False
         self._save_conversation()
         if self.state != "error":
             self._set_state("closed")

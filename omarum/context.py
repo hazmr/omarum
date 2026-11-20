@@ -74,6 +74,7 @@ def build_system_prompt(cfg: Config, store, now: datetime) -> str:
         sections.append(CODE_GUIDE.strip())
     if getattr(cfg, "screen_look", False):
         sections.append(LOOK_GUIDE.strip())
+    sections.append("## Goodbyes\nWhen they say goodbye (\"bye\", \"good night\", \"that's all\"), answer with one short, warm goodbye line. The conversation closes right after you say it.")
     from omarum import firstmeet
 
     if firstmeet.is_first_meeting(store):
