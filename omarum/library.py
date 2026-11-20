@@ -80,7 +80,13 @@ def delete_talk(store, talk: Talk) -> None:
     target = talk.dir.resolve()
     if root not in target.parents:
         raise ValueError(f"refusing to delete {target}: not a saved conversation")
-    shutil.rmtree(target)
+    # Into the trash, not erased: <data>/trash/<day>/<conversation>. Restore by moving it back.
+    trash = store.conversations_dir.parent / "trash" / target.parent.name
+    trash.mkdir(parents=True, exist_ok=True)
+    dest = trash / target.name
+    if dest.exists():
+        shutil.rmtree(dest)
+    shutil.move(str(target), dest)
 
 
 def export(store, dest: Path) -> Path:

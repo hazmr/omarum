@@ -81,3 +81,15 @@ def test_export_contains_profile(tmp_path):
     out = library.export(s, tmp_path / "out")
     with tarfile.open(out) as tar:
         assert any(n.endswith("memory/profile.md") for n in tar.getnames())
+
+
+def test_deleting_a_conversation_moves_it_to_the_trash(tmp_path):
+    """Conversations vanished twice by accident; a delete must be undoable."""
+    s = _store(tmp_path)
+    d = _talk(s, datetime(2026, 11, 19, 9, 0, 0), "bye")
+    t = library.talks(s)[0]
+    library.delete_talk(s, t)
+    assert not d.exists()
+    kept = s.conversations_dir.parent / "trash" / "2026-11-19" / d.name
+    assert (kept / "transcript.jsonl").exists()
+    assert library.talks(s) == []  # gone from Rum and the settings list

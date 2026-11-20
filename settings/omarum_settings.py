@@ -510,7 +510,7 @@ class Settings(Gtk.ApplicationWindow):
                 self.stop_playback()
                 library.delete_talk(self.store, it.data)
                 self.armed = None
-                self.flash("Conversation deleted")
+                self.flash("Conversation moved to the trash (~/.local/share/omarum/trash)")
             else:
                 self.armed = token
                 self.flash("Press d again to delete this conversation")
