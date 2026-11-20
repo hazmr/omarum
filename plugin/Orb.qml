@@ -22,7 +22,8 @@ Scope {
   readonly property var hex: engine.info.colors || ({ user: "#cc8979", companion: "#82c9ed", idle: "#584e51", error: "#ee7350" })
   readonly property var colors: ({
     user: Qt.color(hex.user || "#cc8979"), companion: Qt.color(hex.companion || "#82c9ed"),
-    idle: Qt.color(hex.idle || "#584e51"), error: Qt.color(hex.error || "#ee7350")
+    idle: Qt.color(hex.idle || "#584e51"), error: Qt.color(hex.error || "#ee7350"),
+    thinking: Qt.color(hex.thinking || "#a78bfa")
   })
   readonly property var visibleStates: ["starting", "listening", "user_speaking", "thinking", "speaking", "error"]
   readonly property real voiceThreshold: 0.25  // omarum.orbstate.USER_VOICE_THRESHOLD
@@ -45,15 +46,14 @@ Scope {
     if ((s === "listening" || s === "user_speaking") && userLevel >= voiceThreshold) return "user_speaking"
     return s
   }
-  // Listening / thinking: Rum's color, softened toward the theme's text color so it reads
-  // as calm but stays clearly visible (the theme's "muted" color is nearly black on dark themes).
-  // Idle, listening, thinking: gray (lifted a little so a dark theme gray still shows). Orange is
-  // only while you talk, blue only while Rum talks, so gray also means "she isn't hearing you".
+  // Idle, waiting, waking up: gray (lifted a little so a dark theme gray still shows). Orange only
+  // while you talk, blue only while Rum talks, violet breathing while she thinks.
   readonly property color restColor: mix(colors.idle, Commons.Color.foreground, 0.25)
   function targetColor(s) {
     if (s === "user_speaking") return colors.user
     if (s === "speaking") return colors.companion
     if (s === "error") return colors.error
+    if (s === "thinking") return colors.thinking
     return restColor
   }
   function speakingEnergy(t) {
@@ -157,7 +157,14 @@ Scope {
           ctx.reset()
           var size = Math.min(width, height), c = size / 2
           var t = orb.t, e = orb.energy, col = orb.color
+          var thinking = orb.engine.state === "thinking"
+          var breath = thinking ? 0.5 + 0.5 * Math.sin(t * 2.2) : 1  // thinking: slow in-and-out breathing
           var alpha = orb.alpha * (orb.engine.state === "error" ? 0.6 + 0.4 * Math.sin(t * 2 * Math.PI) : 1)
+                      * (thinking ? 0.55 + 0.45 * breath : 1)
+          if (thinking) {  // the whole orb swells and settles while she thinks
+            var k = 0.86 + 0.14 * breath
+            ctx.translate(width / 2 * (1 - k), height / 2 * (1 - k)); ctx.scale(k, k)
+          }
           function rgba(a) { return Qt.rgba(col.r, col.g, col.b, a) }
           function path(pts, close) {
             ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1])
@@ -196,7 +203,7 @@ Scope {
             path(ring, true); ctx.strokeStyle = rgba(0.9 * alpha); ctx.lineWidth = 2; ctx.stroke()
             ctx.beginPath(); ctx.arc(c, c, 3 + e * 3, 0, 2 * Math.PI); ctx.fillStyle = rgba(0.7 * alpha); ctx.fill()
           } else {
-            var breathe = orb.engine.state === "thinking" ? 0.9 + 0.05 * Math.sin(t * 3) : 1
+            var breathe = 1
             var base = size * 0.29
             for (var layer = 3; layer >= 0; layer--) {
               var rb = base * (0.55 + layer * 0.12) * breathe * (1 + 0.04 * Math.sin(t * 1.3)) + e * size * 0.05

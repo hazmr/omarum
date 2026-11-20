@@ -91,3 +91,16 @@ def test_classic_colors_are_the_default():
     assert Config().orb_colors == "classic"
     c = PRESETS["classic"]
     assert c["user"] == _hex("#ff8c42") and c["companion"] == _hex("#4da3ff") and c["idle"] == _hex("#8c8c8c")
+
+
+def test_thinking_has_its_own_color():
+    from datetime import date
+
+    from omarum.config import Config
+    from omarum.summary import summary
+    from omarum.theme import PRESETS, _hex, palette_for
+
+    assert PRESETS["classic"]["thinking"] == _hex("#a78bfa")
+    s = summary(Config(orb_colors="classic"), [], date(2026, 11, 20), False, palette_for("classic"))
+    assert set(s["colors"]) >= {"user", "companion", "idle", "thinking", "error"}
+    assert s["colors"]["thinking"] not in (s["colors"]["user"], s["colors"]["companion"], s["colors"]["idle"])

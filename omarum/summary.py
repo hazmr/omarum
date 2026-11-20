@@ -67,6 +67,7 @@ def summary(cfg, talks, today: date, has_gpu: bool, palette: dict[str, RGB]) -> 
             "user": to_hex(vivid(palette["user"])),
             "companion": to_hex(vivid(palette["companion"])),
             "idle": to_hex(palette["idle"]),
+            "thinking": to_hex(vivid(palette.get("thinking", (0.655, 0.545, 0.98)))),  # violet unless the palette says
             "error": to_hex(vivid(palette["error"])),
         },
     }

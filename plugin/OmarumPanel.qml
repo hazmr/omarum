@@ -41,7 +41,8 @@ Panel {
   function orbColor(onBar) {
     if (state === "user_speaking") return colors.user
     if (state === "speaking") return colors.companion
-    if (state === "thinking" || state === "listening" || state === "starting") return colors.idle
+    if (state === "thinking") return colors.thinking || colors.idle
+    if (state === "listening" || state === "starting") return colors.idle
     if (state === "error") return colors.error
     return onBar ? Qt.darker(root.barForeground, running ? 1.0 : 1.55) : colors.companion
   }
