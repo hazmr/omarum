@@ -37,9 +37,13 @@ The first time it loads, Omarum sets up its Python environment and downloads the
 
 ## Talking to Rum
 
-**Ctrl + Shift + Space is a walkie-talkie:** hold it and talk, let go and Rum answers. Holding it while Rum is talking stops her, and it's your turn. A quick tap does nothing, so she never opens by accident.
+**Ctrl + Shift + Space** (you can keep Ctrl + Shift down the whole time; only Space counts):
 
-**To close Rum, just say goodbye:** "bye", "good night", "that's all", "talk to you later". She answers with a short goodbye and closes. A conversation also closes by itself after a few seconds of silence.
+- **Double tap Space:** open Rum, or close her, in any state: listening, thinking or talking.
+- **Hold Space:** talk; let go and Rum answers. Holding while she talks stops her, and it's your turn.
+- **One tap** never opens or closes her; while she's talking it just stops her.
+
+**Or just say goodbye:** "bye", "good night", "that's all", "talk to you later". She answers with a short goodbye and closes. A conversation also closes by itself after a few seconds of silence.
 
 **Hands-free** (talk without holding a key): right-click the orb in the bar, or use the switch in its panel.
 

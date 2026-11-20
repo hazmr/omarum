@@ -96,6 +96,8 @@ class Daemon:
             self.hub.broadcast(msg)
 
     def _set_state(self, state: str, reason: str | None = None) -> None:
+        if state != self.state:
+            logger.info(f"state: {self.state} -> {state}")
         self.state = state
         self.reason = reason if state == "error" else None
         if state == "listening":

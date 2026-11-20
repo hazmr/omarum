@@ -1,10 +1,14 @@
-"""Ctrl+Shift+Space is a walkie-talkie. Stdlib only.
+"""Ctrl+Shift+Space. Stdlib only. Ctrl+Shift can stay down the whole time; only Space is timed.
 
-- Hold Space (with Ctrl+Shift down): you talk. Let go: Rum answers. That's all the key does.
-- Holding while Rum talks stops her, and it's your turn.
-- A quick tap while Rum is closed does nothing, so she never opens by accident.
-- A quick tap while Rum is open closes her (saying "bye", silence or the bar also close her).
-- Hands-free (no key at all) is the bar orb / panel switch: toggle().
+- Double tap Space: open Rum if she's closed, close her in any other state (starting,
+  listening, thinking, talking).
+- Hold Space: you talk; let go and Rum answers. Holding while Rum talks stops her.
+- A single tap only stops Rum if she's talking; it never opens or closes.
+- Hands-free (mic always on) is what a double tap opens; the bar orb / panel switch: toggle().
+
+Hyprland quirks this handles (seen in daemon.log): every release of Space arrives as an extra
+"down" plus the "up", and a very quick tap may arrive only as that pair. So taps are counted on
+release, and a "down" while already down is ignored.
 
 Modes: closed · hold (mic on only while the key is down) · hands_free (mic always on).
 Actions for the daemon: start, stop, interrupt, mic_open, mic_close, hold_start, hold_end.
@@ -13,7 +17,8 @@ The daemon calls tick() TAP_SECS after a press, to start Rum once a press from c
 
 from __future__ import annotations
 
-TAP_SECS = 0.3  # held longer than this while closed: open Rum for your turn
+TAP_SECS = 0.3  # down shorter than this: a tap; longer while closed: open Rum for your turn
+DOUBLE_SECS = 0.6  # two taps (release to release) within this: open / close
 
 
 class PushToTalk:
@@ -21,6 +26,7 @@ class PushToTalk:
         self.mode = "closed"
         self._down_at: float | None = None
         self._holding = False
+        self._last_tap: float | None = None
 
     def press(self, now: float, open_: bool, speaking: bool) -> list[str]:
         if self._down_at is not None:
@@ -28,10 +34,10 @@ class PushToTalk:
         if not open_:
             self.mode = "closed"
         elif self.mode == "closed":
-            self.mode = "hold"  # Rum is open but we thought closed: resync, so a tap can close her
+            self.mode = "hold"  # Rum is open but we thought closed: resync
         self._down_at, self._holding = now, False
         if self.mode == "closed":
-            return []  # wait: a quick tap shouldn't open Rum (tick() decides)
+            return []  # wait: a tap shouldn't open Rum (tick() decides on a hold)
         self._holding = True
         return (["interrupt"] if speaking else []) + ["hold_start", "mic_open"]
 
@@ -40,6 +46,7 @@ class PushToTalk:
         if self._down_at is None or self._holding or now - self._down_at < TAP_SECS:
             return []
         self._holding = True
+        self._last_tap = None
         self.mode = "hold"
         return ["mic_open", "start", "hold_start"]
 
@@ -50,16 +57,26 @@ class PushToTalk:
         early = self.tick(now)  # a hold the daemon's timer hasn't seen yet
         held = self._holding
         self._down_at, self._holding = None, False
-        if not held:
-            return early  # a quick tap while closed: nothing
-        if not early and now - down_at < TAP_SECS:  # a quick tap while open: close Rum
-            self.mode = "closed"
-            return ["hold_end", "stop"]
-        return early + ["hold_end"] + (["mic_close"] if self.mode == "hold" else [])
+        actions = early + (["hold_end"] if held else [])
+        if held and self.mode == "hold":
+            actions.append("mic_close")
+        if early or now - down_at >= TAP_SECS:
+            self._last_tap = None  # a hold, not a tap
+            return actions
+        # A tap. Two in a row: open or close.
+        if self._last_tap is None or now - self._last_tap > DOUBLE_SECS:
+            self._last_tap = now
+            return actions
+        self._last_tap = None
+        if self.mode == "closed":
+            self.mode = "hands_free"
+            return actions + ["mic_open", "start"]
+        self.mode = "closed"
+        return actions + ["stop"]
 
     def toggle(self, open_: bool) -> list[str]:
         """The bar orb and panel switch: hands-free on, or close."""
-        self._down_at, self._holding = None, False
+        self._down_at, self._holding, self._last_tap = None, False, None
         if open_:
             self.mode = "closed"
             return ["stop"]
@@ -71,3 +88,4 @@ class PushToTalk:
         self.mode = "closed"
         self._down_at = None
         self._holding = False
+        self._last_tap = None

@@ -403,7 +403,7 @@ async def test_ptt_hold_starts_session_and_release_closes_mic(monkeypatch):
 
 
 async def test_ptt_tap_hands_free_then_tap_closes(monkeypatch):
-    """Walkie-talkie: taps never open Rum (only holding does); one tap while she's open closes her."""
+    """One tap does nothing while closed; holding opens her; a double tap closes her."""
     clock = [0.0]
     monkeypatch.setattr("omarum.daemon.time.monotonic", lambda: clock[0])
     f = GateFactory()
@@ -416,8 +416,7 @@ async def test_ptt_tap_hands_free_then_tap_closes(monkeypatch):
         await d.handle({"cmd": "ptt_up"})
 
     await tap(0.0)
-    await tap(0.3)
-    assert f.starts == 0  # taps while closed: nothing
+    assert f.starts == 0  # one tap while closed: nothing
     clock[0] = 1.0
     await d.handle({"cmd": "ptt_down"})
     clock[0] = 1.4
@@ -426,7 +425,9 @@ async def test_ptt_tap_hands_free_then_tap_closes(monkeypatch):
     await d.handle({"cmd": "ptt_up"})
     assert f.starts == 1 and d.state == "listening"
     await tap(5.0)
-    assert d.state == "closed" and f.stops == 1  # one quick tap while open closes her
+    assert d.state != "closed"  # one tap while open: still open
+    await tap(5.3)
+    assert d.state == "closed" and f.stops == 1  # a double tap closes her
 
 async def test_ptt_hold_interrupts_rum(monkeypatch):
     clock = [0.0]
@@ -509,7 +510,7 @@ async def test_brain_without_key_errors_with_reason(monkeypatch):
 
 
 async def test_quick_tap_over_one_connection_is_a_tap_even_while_starting():
-    """The plugin sends press and release on one socket; quick taps must stay taps (nothing opens)."""
+    """The plugin sends press and release on one socket; two quick taps are a double tap (opens)."""
     f = FakeFactory(build_delay=0.6)
     d = make(f)
 
@@ -521,8 +522,8 @@ async def test_quick_tap_over_one_connection_is_a_tap_even_while_starting():
 
     await tap()
     await tap()
-    await asyncio.sleep(0.5)  # past the hold timer: still nothing, because the key came up at once
-    assert f.starts == 0 and d._ptt.mode == "closed"
+    await asyncio.sleep(0.8)  # past the hold timer: a double tap, not a hold
+    assert f.starts == 1 and d._ptt.mode == "hands_free"
 
 
 async def test_saying_bye_closes_rum_after_her_goodbye():

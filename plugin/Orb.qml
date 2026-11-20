@@ -158,11 +158,14 @@ Scope {
           var size = Math.min(width, height), c = size / 2
           var t = orb.t, e = orb.energy, col = orb.color
           var thinking = orb.engine.state === "thinking"
-          var breath = thinking ? 0.5 + 0.5 * Math.sin(t * 2.2) : 1  // thinking: slow in-and-out breathing
+          // Thinking: a deep breath about every 1.6 s (swell and brighten, shrink and fade),
+          // with three dots circling the orb (drawn at the end). No other state looks like it.
+          var breath = thinking ? 0.5 + 0.5 * Math.sin(t * 3.9) : 1
           var alpha = orb.alpha * (orb.engine.state === "error" ? 0.6 + 0.4 * Math.sin(t * 2 * Math.PI) : 1)
-                      * (thinking ? 0.55 + 0.45 * breath : 1)
-          if (thinking) {  // the whole orb swells and settles while she thinks
-            var k = 0.86 + 0.14 * breath
+                      * (thinking ? 0.45 + 0.55 * breath : 1)
+          ctx.save()
+          if (thinking) {
+            var k = 0.78 + 0.22 * breath
             ctx.translate(width / 2 * (1 - k), height / 2 * (1 - k)); ctx.scale(k, k)
           }
           function rgba(a) { return Qt.rgba(col.r, col.g, col.b, a) }
@@ -219,6 +222,16 @@ Scope {
               var g = ctx.createRadialGradient(c, c - size * 0.04, 3, c, c, maxR * 1.2)
               g.addColorStop(0, rgba((0.6 - layer * 0.1) * alpha)); g.addColorStop(1, rgba(0.04 * alpha))
               ctx.fillStyle = g; ctx.fill()
+            }
+          }
+          ctx.restore()
+          if (thinking) {  // three dots chasing each other around the orb
+            for (var d = 0; d < 3; d++) {
+              var da = t * 2.6 - d * 0.45
+              var dr = size * 0.40
+              ctx.beginPath()
+              ctx.arc(c + Math.cos(da) * dr, c + Math.sin(da) * dr, size * (0.028 - d * 0.006), 0, 2 * Math.PI)
+              ctx.fillStyle = rgba(orb.alpha * (0.95 - d * 0.25)); ctx.fill()
             }
           }
         }

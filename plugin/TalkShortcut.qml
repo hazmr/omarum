@@ -31,7 +31,7 @@ Scope {
     // release without a press is ignored by the daemon.
     eval_('pcall(hl.unbind, "' + keys + '")\n'
       + 'hl.bind("' + keys + '", hl.dsp.global("omarum:talk-down"), '
-      + '{ description = "Talk to Rum (hold to talk, let go to hear her)" })\n'
+      + '{ description = "Talk to Rum (double tap: open/close, hold: talk)" })\n'
       + 'hl.bind("' + keys + '", hl.dsp.global("omarum:talk-up"), '
       + '{ description = "Talk to Rum: release", release = true, transparent = true, ignore_mods = true, non_consuming = true })')
     bound = keys
