@@ -51,7 +51,7 @@ class Config:
     orb_position: str = "top-right"  # top-right | top-center | top-left | center | bottom-center
     orb_style: str = "glow"  # glow | lines | ring
     orb_size: int = 160  # px, 96-320
-    orb_colors: str = "theme"  # theme | warm | glass | mono
+    orb_colors: str = "classic"  # classic (orange you, blue Rum, gray idle) | theme | warm | glass | mono
     screen_look: bool = True  # "look at my screen": Rum takes one screenshot, only when you ask
     screen_awareness: bool = True  # Rum sees the file open in a focused code editor (IntelliJ, VS Code) when you talk
     talk_shortcut: str = "CTRL + SHIFT + SPACE"  # hold to talk, let go and Rum answers; "" = none
@@ -64,7 +64,7 @@ CHOICES: dict[str, tuple] = {
     "voice_primary": ("elevenlabs", "zonos3", "kokoro", "piper"),
     "orb_style": ("glow", "lines", "ring"),
     "orb_position": ("top-right", "top-center", "top-left", "center", "bottom-center"),
-    "orb_colors": ("theme", "warm", "glass", "mono"),
+    "orb_colors": ("classic", "theme", "warm", "glass", "mono"),
     "whisper_device": ("auto", "cuda", "cpu"),
 }
 

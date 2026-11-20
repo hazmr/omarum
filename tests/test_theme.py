@@ -81,3 +81,13 @@ def test_ui_colors_from_theme(tmp_path):
 def test_ui_colors_reject_bad_values(tmp_path):
     (tmp_path / "colors.toml").write_text('background = "red; }"\n')
     assert theme.ui_colors(theme_dir=tmp_path)["background"] == theme.UI_FALLBACK["background"]
+
+
+def test_classic_colors_are_the_default():
+    """Orange = you talking, blue = Rum talking (like the first demo), gray = idle (mic off)."""
+    from omarum.config import Config
+    from omarum.theme import PRESETS, _hex
+
+    assert Config().orb_colors == "classic"
+    c = PRESETS["classic"]
+    assert c["user"] == _hex("#ff8c42") and c["companion"] == _hex("#4da3ff") and c["idle"] == _hex("#8c8c8c")

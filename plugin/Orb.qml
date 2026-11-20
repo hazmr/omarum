@@ -47,7 +47,9 @@ Scope {
   }
   // Listening / thinking: Rum's color, softened toward the theme's text color so it reads
   // as calm but stays clearly visible (the theme's "muted" color is nearly black on dark themes).
-  readonly property color restColor: mix(colors.companion, Commons.Color.foreground, 0.35)
+  // Idle, listening, thinking: gray (lifted a little so a dark theme gray still shows). Orange is
+  // only while you talk, blue only while Rum talks, so gray also means "she isn't hearing you".
+  readonly property color restColor: mix(colors.idle, Commons.Color.foreground, 0.25)
   function targetColor(s) {
     if (s === "user_speaking") return colors.user
     if (s === "speaking") return colors.companion

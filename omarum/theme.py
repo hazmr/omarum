@@ -90,6 +90,8 @@ def _preset(user: str, companion: str) -> dict[str, RGB]:
 
 
 PRESETS: dict[str, dict[str, RGB]] = {
+    # The default: orange while you talk, blue while Rum talks (like the first demo), gray when idle.
+    "classic": {**_preset("#ff8c42", "#4da3ff"), "idle": _hex("#8c8c8c")},
     "warm": _preset("#ff8a65", "#ffb74d"),
     "glass": _preset("#9ad1ff", "#e0f2ff"),
     "mono": _preset("#e0e0e0", "#ffffff"),
