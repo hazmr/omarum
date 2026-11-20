@@ -180,13 +180,13 @@ class Daemon:
                 asyncio.get_running_loop().call_later(
                     TAP_SECS + 0.02, lambda: asyncio.ensure_future(self._ptt_act(self._ptt.tick(time.monotonic()))))
                 return await self._ptt_act(self._ptt.press(
-                    time.monotonic(), open_=self._active or self._starting, speaking=self.state == "speaking"))
+                    time.monotonic(), open_=self._active or self._starting, speaking=self.state == "speaking"), "down")
             case "tap":  # the bar button and panel switch: hands-free on, or close
                 if self._starting:
                     return self._reply()
                 return await self._ptt_act(self._ptt.toggle(open_=self._active))
             case "ptt_up":
-                return await self._ptt_act(self._ptt.release(time.monotonic()))
+                return await self._ptt_act(self._ptt.release(time.monotonic()), "up")
             case "reload":
                 from omarum.config import load_config
 
@@ -210,7 +210,9 @@ class Daemon:
         if gate is not None:
             gate.set_open(open_)
 
-    async def _ptt_act(self, actions: list[str]) -> dict:
+    async def _ptt_act(self, actions: list[str], what: str = "") -> dict:
+        if what or actions:  # every key event and what it did (to debug the talk key)
+            logger.info(f"key {what or 'tick'}: mode={self._ptt.mode} state={self.state} -> {actions}")
         for action in actions:
             if action == "start":
                 await self._start()
