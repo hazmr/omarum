@@ -44,7 +44,7 @@ def test_gpu_ready_when_both_libraries_are_there(tmp_path):
     (tmp_path / "gpu").mkdir()
     (tmp_path / "gpu" / "libcublas.so.12").write_bytes(b"x")
     assert catalog.state(m, tmp_path)["state"] != "ready"
-    (tmp_path / "gpu" / "libcudnn.so.9").write_bytes(b"x")
+    (tmp_path / "gpu" / "libcublasLt.so.12").write_bytes(b"x")
     assert catalog.state(m, tmp_path)["state"] == "ready"
 
 

@@ -126,3 +126,32 @@ def test_preload_loads_the_model_rum_will_use(monkeypatch):
     monkeypatch.setattr(models, "cached_whisper_model", lambda name, device, compute: got.append((name, device, compute)))
     models.preload_whisper(Config(), cuda_devices=0, cuda_libs=False)
     assert got == [(models.resolve_whisper_model("base.en"), "cpu", "int8")]
+
+
+def test_preload_gpu_libs_loads_lt_first(tmp_path):
+    from pathlib import Path
+
+    from omarum import models
+
+    gpu = tmp_path / "gpu"
+    gpu.mkdir()
+    for n in ("libcublas.so.12", "libcublasLt.so.12"):
+        (gpu / n).write_bytes(b"")
+    loaded = []
+    assert models.preload_gpu_libs(tmp_path, loader=lambda p, mode=0: loaded.append(Path(p).name))
+    assert loaded == ["libcublasLt.so.12", "libcublas.so.12"]
+
+
+def test_preload_gpu_libs_without_the_pack(tmp_path):
+    from omarum import models
+
+    assert models.preload_gpu_libs(tmp_path, loader=lambda p, mode=0: None) is False
+
+
+def test_pick_whisper_falls_back_when_gpu_pack_missing():
+    from omarum import models
+    from omarum.config import Config
+
+    cfg = Config(whisper_device="auto")
+    assert models.pick_whisper(cfg, cuda_devices=1, cuda_libs=False) == ("base.en", "cpu", "int8")
+    assert models.pick_whisper(cfg, cuda_devices=1, cuda_libs=True)[1] == "cuda"

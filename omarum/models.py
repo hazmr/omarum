@@ -16,12 +16,31 @@ def resolve_whisper_model(name: str, models_dir: Path = MODELS_DIR) -> str:
 
 
 CUDA_LIBS = ("libcublas.so.12",)  # what CTranslate2's CUDA build loads to transcribe
+GPU_LIBS = ("libcublasLt.so.12", "libcublas.so.12")  # Models tab → GPU support, load order
+
+
+def preload_gpu_libs(models_dir: Path = MODELS_DIR, loader=None) -> bool:
+    """Load the downloaded cuBLAS (models/gpu) globally, so CTranslate2 finds it by name."""
+    import ctypes
+
+    gpu = Path(models_dir) / "gpu"
+    if not all((gpu / n).is_file() for n in GPU_LIBS):
+        return False
+    load = loader or ctypes.CDLL
+    try:
+        for name in GPU_LIBS:
+            load(str(gpu / name), mode=ctypes.RTLD_GLOBAL)
+    except OSError:
+        return False
+    return True
 
 
 def cuda_libs_loadable(loader=None) -> bool:
     """A GPU is only usable for Whisper if the CUDA math libraries load (the driver alone isn't enough)."""
     import ctypes
 
+    if loader is None and preload_gpu_libs():
+        return True
     load = loader or ctypes.CDLL
     try:
         for name in CUDA_LIBS:
@@ -43,10 +62,10 @@ def pick_whisper(cfg, cuda_devices: int | None = None, cuda_libs: bool | None = 
     use_cuda = (cfg.whisper_device == "cuda" and gpu) or (cfg.whisper_device == "auto" and gpu)
     if use_cuda:
         return (cfg.whisper_model, "cuda", "default")
-    if cfg.whisper_device == "cuda" and cuda_devices > 0 and not cuda_libs:
+    if cfg.whisper_device in ("cuda", "auto") and cuda_devices > 0 and not cuda_libs:
         from loguru import logger
 
-        logger.warning("whisper_device = cuda, but libcublas.so.12 isn't installed; using the CPU model")
+        logger.warning(f"whisper: Accurate needs GPU support (settings → Models); using {cfg.whisper_cpu_model} on cpu")
     return (cfg.whisper_cpu_model, "cpu", "int8")
 
 
