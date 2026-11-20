@@ -24,13 +24,15 @@ Scope {
   function bind() {
     if (bound && bound !== keys) unbind()
     if (!keys) return
-    // Unbind first: after a shell restart the old instance's binds are still in Hyprland, and two
-    // press binds made one press arrive twice (read as a double tap: open/close by accident).
+    // The keys send the two shortcut events straight away: no Lua functions with a shared "held"
+    // flag (those stopped firing after the first press while Ctrl+Shift stayed down). Unbind
+    // first: after a shell or plugin reload the old binds are still in Hyprland. The release bind
+    // ignores modifiers, so letting go of Space counts even with Ctrl+Shift still held; a stray
+    // release without a press is ignored by the daemon.
     eval_('pcall(hl.unbind, "' + keys + '")\n'
-      + 'local held = false\n'
-      + 'hl.bind("' + keys + '", function() held = true; hl.dispatch(hl.dsp.global("omarum:talk-down")) end, '
+      + 'hl.bind("' + keys + '", hl.dsp.global("omarum:talk-down"), '
       + '{ description = "Talk to Rum (hold to talk, let go to hear her)" })\n'
-      + 'hl.bind("' + keys + '", function() if held then held = false; hl.dispatch(hl.dsp.global("omarum:talk-up")) end end, '
+      + 'hl.bind("' + keys + '", hl.dsp.global("omarum:talk-up"), '
       + '{ description = "Talk to Rum: release", release = true, transparent = true, ignore_mods = true, non_consuming = true })')
     bound = keys
   }
