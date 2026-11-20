@@ -23,8 +23,12 @@ class PushToTalk:
         self._holding = False
 
     def press(self, now: float, open_: bool, speaking: bool) -> list[str]:
+        if self._down_at is not None:
+            return []  # already down: Hyprland sends a second "down" together with the release
         if not open_:
             self.mode = "closed"
+        elif self.mode == "closed":
+            self.mode = "hold"  # Rum is open but we thought closed: resync, so a tap can close her
         self._down_at, self._holding = now, False
         if self.mode == "closed":
             return []  # wait: a quick tap shouldn't open Rum (tick() decides)

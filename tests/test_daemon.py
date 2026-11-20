@@ -562,3 +562,14 @@ async def test_rum_shows_she_is_waking_up_right_away():
     d._set_state = spy
     await d.handle({"cmd": "toggle"})
     assert seen[:2] == ["starting", "listening"]
+
+
+async def test_a_close_during_startup_closes_once_started():
+    f = FakeFactory(build_delay=0.4)
+    d = make(f)
+    start = asyncio.create_task(d.handle({"cmd": "toggle"}))
+    await asyncio.sleep(0.1)
+    await d._ptt_act(["stop"])  # arrives while Rum is still starting
+    await start
+    await asyncio.sleep(0.2)
+    assert d.state == "closed" and f.stops == 1

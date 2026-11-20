@@ -83,3 +83,29 @@ def test_session_closed_elsewhere_resets():
 
 def test_release_without_press_does_nothing():
     assert PushToTalk().release(1.0) == []
+
+
+def test_a_second_down_with_the_release_is_ignored():
+    """Hyprland sends down+up together when Space is let go (log, 2026-11-20 14:07:43);
+    the extra down made every hold end as a tap that closed Rum."""
+    p = PushToTalk()
+    assert p.press(42.907, False, False) == []
+    assert p.tick(43.228) == ["mic_open", "start", "hold_start"]
+    assert p.press(43.771, True, False) == []          # the extra down: ignored
+    assert p.release(43.772) == ["hold_end", "mic_close"]  # a hold, not a tap: no "stop"
+
+
+def test_a_tap_still_closes_with_the_extra_down():
+    p = PushToTalk()
+    p.toggle(open_=False)
+    assert p.press(35.620, True, False) == ["hold_start", "mic_open"]
+    assert p.press(35.824, True, False) == []          # extra down at release
+    assert p.release(35.824)[-1] == "stop"             # 0.2 s: a tap closes her
+
+
+def test_open_but_out_of_sync_still_responds():
+    """Rum was open while the key logic thought she was closed: taps did nothing."""
+    p = PushToTalk()
+    p.mode = "closed"
+    assert p.press(10.0, open_=True, speaking=False) == ["hold_start", "mic_open"]
+    assert p.release(10.1)[-1] == "stop"

@@ -66,6 +66,7 @@ class Daemon:
         self._holding = False  # the talk key is down for a hold: Rum waits for the release
         self._farewell_at = 0.0  # when they said goodbye in this conversation (0 = not yet)
         self._farewell_spoke = False
+        self._stop_when_started = False  # a close that came while Rum was still starting
         self._audio_free_at = 0.0  # monotonic time when the last session's audio threads are done
 
     # -- events from the pipeline -------------------------------------------
@@ -217,7 +218,10 @@ class Daemon:
             if action == "start":
                 await self._start()
             elif action == "stop":
-                await self._end()
+                if self._starting and not self._active:
+                    self._stop_when_started = True  # closed while still starting: close once up
+                else:
+                    await self._end()
             elif action == "interrupt":
                 gate = getattr(self._recording, "gate", None)
                 if gate is not None:
@@ -285,6 +289,11 @@ class Daemon:
         if self._holding and hold is not None:
             hold.hold()  # the key went down (a hold) while Rum was still starting
         self._runner = asyncio.create_task(self._run(task, self._session))
+        if self._stop_when_started:
+            self._stop_when_started = False
+            self._set_state("listening")
+            asyncio.create_task(self._end())
+            return self._reply()
         self._watchdog = asyncio.create_task(self._watch_idle())
         self._set_state("listening")
         return self._reply()
