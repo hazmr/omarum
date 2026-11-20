@@ -128,9 +128,11 @@ Panel {
           anchors.centerIn: parent
           width: button.iconSize * 1.15
           height: width
-          color: root.orbColor(true)
+          color: button.foreground  // white like the other bar icons; the motion shows the state
           live: root.open_
+          rumState: root.state
           energy: root.energy
+          opacity: root.running ? 1 : 0.55
         }
       }
     }
@@ -190,6 +192,7 @@ Panel {
                 height: width
                 color: root.orbColor(false)
                 live: root.running
+                rumState: root.state
                 energy: root.energy
                 opacity: root.running ? 1 : 0.45
               }
