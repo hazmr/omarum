@@ -10,7 +10,8 @@ import json
 import sys
 from pathlib import Path
 
-KOKORO_URL = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
+from omarum import catalog, downloader
+from omarum.catalog import KOKORO_URL
 KOKORO_FILES = ("kokoro-v1.0.onnx", "voices-v1.0.bin")
 
 
@@ -18,20 +19,18 @@ def _say(step: str, done: int, total: int, message: str) -> None:
     print(json.dumps({"step": step, "done": done, "total": total, "message": message}), flush=True)
 
 
-def _download_whisper(name: str, dest: Path) -> None:
-    from faster_whisper import download_model
+WHISPER_IDS = {"base.en": "whisper-base", "small.en": "whisper-small", "large-v3-turbo": "whisper-large-turbo"}
 
-    download_model(name, output_dir=str(dest))
+
+def _download_whisper(name: str, dest: Path) -> None:
+    """Through the catalog, like settings → Models: resumable, verified, never half there."""
+    m = catalog.by_id(WHISPER_IDS[name])
+    models_dir = Path(dest).parents[len(Path(m.folder).parts) - 1]
+    downloader.download(m, models_dir, list(m.files), emit=lambda e: None, cancelled=lambda: False)
 
 
 def _download_file(url: str, dest: Path) -> None:
-    import urllib.request
-
-    part = dest.with_suffix(dest.suffix + ".part")
-    with urllib.request.urlopen(url, timeout=60) as resp, open(part, "wb") as out:
-        while chunk := resp.read(1 << 20):
-            out.write(chunk)
-    part.rename(dest)
+    downloader.fetch(catalog.FileSpec(url, dest.name), dest, on_bytes=lambda n: None, cancelled=lambda: False)
 
 
 def _migrate() -> list[str]:

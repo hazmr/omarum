@@ -10,6 +10,11 @@ from omarum.ipc import SOCKET_PATH, DaemonNotRunning, send_command
 
 
 def main(argv: list[str] | None = None) -> None:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["models"]:  # omarum models list|download|cancel|remove (settings → Models)
+        from omarum import modelcmd
+
+        sys.exit(modelcmd.main(argv[1:]))
     parser = argparse.ArgumentParser(prog="omarum", description="Talk to Rum.")
     parser.add_argument("command", choices=["daemon", "toggle", "start", "stop", "status", "reload", "settings", "ptt_down", "ptt_up", "tap", "watch", "summary"])
     parser.add_argument("arg", nargs="?", default="", help="settings: the tab to open (companion, engine, memory, conversations)")
