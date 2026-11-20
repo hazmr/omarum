@@ -3,7 +3,7 @@
 - Hold Space (with Ctrl+Shift down): you talk. Let go: Rum answers. That's all the key does.
 - Holding while Rum talks stops her, and it's your turn.
 - A quick tap while Rum is closed does nothing, so she never opens by accident.
-- The key never closes Rum: a conversation ends after a few seconds of silence, or from the bar.
+- A quick tap while Rum is open closes her (saying "bye", silence or the bar also close her).
 - Hands-free (no key at all) is the bar orb / panel switch: toggle().
 
 Modes: closed · hold (mic on only while the key is down) · hands_free (mic always on).
@@ -42,11 +42,15 @@ class PushToTalk:
     def release(self, now: float) -> list[str]:
         if self._down_at is None:
             return []
+        down_at = self._down_at
         early = self.tick(now)  # a hold the daemon's timer hasn't seen yet
         held = self._holding
         self._down_at, self._holding = None, False
         if not held:
             return early  # a quick tap while closed: nothing
+        if not early and now - down_at < TAP_SECS:  # a quick tap while open: close Rum
+            self.mode = "closed"
+            return ["hold_end", "stop"]
         return early + ["hold_end"] + (["mic_close"] if self.mode == "hold" else [])
 
     def toggle(self, open_: bool) -> list[str]:

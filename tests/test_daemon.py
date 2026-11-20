@@ -403,7 +403,7 @@ async def test_ptt_hold_starts_session_and_release_closes_mic(monkeypatch):
 
 
 async def test_ptt_tap_hands_free_then_tap_closes(monkeypatch):
-    """Walkie-talkie: quick taps never open or close Rum; only holding opens her."""
+    """Walkie-talkie: taps never open Rum (only holding does); one tap while she's open closes her."""
     clock = [0.0]
     monkeypatch.setattr("omarum.daemon.time.monotonic", lambda: clock[0])
     f = GateFactory()
@@ -426,8 +426,7 @@ async def test_ptt_tap_hands_free_then_tap_closes(monkeypatch):
     await d.handle({"cmd": "ptt_up"})
     assert f.starts == 1 and d.state == "listening"
     await tap(5.0)
-    await tap(5.3)
-    assert d.state == "listening" and f.stops == 0  # the key never closes her
+    assert d.state == "closed" and f.stops == 1  # one quick tap while open closes her
 
 async def test_ptt_hold_interrupts_rum(monkeypatch):
     clock = [0.0]

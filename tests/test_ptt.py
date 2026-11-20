@@ -39,10 +39,24 @@ def test_holding_while_rum_talks_stops_her_and_gives_you_the_turn():
     assert p.press(10.0, open_=True, speaking=True) == ["interrupt", "hold_start", "mic_open"]
 
 
-def test_the_key_never_closes_rum():
+def test_one_tap_while_open_closes_rum():
+    p = PushToTalk()
+    p.press(0.0, False, False); p.tick(0.4); p.release(3.0)  # a conversation is open
+    actions = p.press(10.0, open_=True, speaking=False) + p.release(10.1)
+    assert actions[-1] == "stop" and p.mode == "closed"
+
+
+def test_a_tap_while_she_talks_stops_her_and_closes():
+    p = PushToTalk()
+    p.toggle(open_=False)
+    actions = p.press(5.0, open_=True, speaking=True) + p.release(5.1)
+    assert actions[0] == "interrupt" and actions[-1] == "stop"
+
+
+def test_a_hold_while_open_never_closes():
     p = PushToTalk()
     p.press(0.0, False, False); p.tick(0.4); p.release(3.0)
-    actions = p.press(10.0, True, False) + p.release(10.1) + p.press(10.3, True, False) + p.release(10.4)
+    actions = p.press(10.0, True, False) + p.release(12.0)
     assert "stop" not in actions and p.mode == "hold"
 
 
