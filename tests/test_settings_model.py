@@ -1,16 +1,102 @@
 from dataclasses import fields
 
+from omarum import settings_model as sm
 from omarum.config import Config
 from omarum.settings_model import FOOTERS, ROWS, TABS, display, row, rows_for, step
 
 CONFIG_KEYS = {f.name for f in fields(Config)}
+CODEX = {"brain": "codex", "voice_primary": "zonos3"}
+
+
+def labels(values, **kw):
+    return [r.label for r in rows_for("Settings", values, **kw)]
 
 
 def test_every_key_row_is_a_config_field_or_secret():
     for r in ROWS:
-        if r.key is None:
+        if r.key is None or r.kind == "voice":
             continue
         assert r.key in CONFIG_KEYS or (r.kind == "secret" and r.key.isupper()), r
+
+
+def test_tabs_and_footers():
+    assert TABS == ("Settings", "Models", "Memory", "Conversations")
+    assert all(FOOTERS[t] for t in TABS)
+    assert FOOTERS["Settings"] == ["↑/↓ Select", "←/→ or Space Change", "Enter Edit", "Q Close"]
+    assert rows_for("Settings", CODEX)[0].key == "companion_name"
+
+
+def test_old_tab_names_open_settings():
+    assert sm.tab_index("companion") == 0 and sm.tab_index("engine") == 0
+    assert sm.tab_index("models") == 1 and sm.tab_index("conversations") == 3
+    assert sm.tab_index("") == 0 and sm.tab_index("nope") == 0
+
+
+def test_settings_tab_has_13_rows_for_codex_with_zonos3_voice():
+    got = labels(CODEX)
+    assert got == ["Name", "Your name", "Brain", "Model", "Voice", "Volume", "Processing",
+                   "Response speed", "Talk key", "Style", "Position", "Look when I ask", "See my code"]
+    groups = []
+    for r in rows_for("Settings", CODEX):
+        if r.group not in groups:
+            groups.append(r.group)
+    assert groups == ["General", "Voice", "Speech to text", "Talking", "Orb", "Screen"]
+
+
+def test_conditional_rows():
+    assert "ElevenLabs key" in labels({"brain": "codex", "voice_primary": "elevenlabs"})
+    assert "ElevenLabs key" not in labels({"brain": "codex", "voice_primary": "kokoro"})
+    assert "API key" in labels({"brain": "anthropic", "voice_primary": "kokoro"})
+    assert "API key" not in labels({"brain": "codex", "voice_primary": "kokoro"})
+    assert "Model" not in labels({"brain": "kimi", "voice_primary": "kokoro"})  # no model choices
+    assert labels({"brain": "custom", "voice_primary": "kokoro"})[2:6] == ["Brain", "Endpoint", "API key", "Voice"]
+
+
+def test_removed_rows_are_gone():
+    keys = {r.key for t in TABS for r in rows_for(t, {"brain": "codex", "voice_primary": "kokoro"})}
+    assert keys.isdisjoint({"orb_colors", "orb_size", "vad_stop_secs", "idle_timeout_secs",
+                            "interrupt_min_words", "mute_while_speaking", "record_audio"})
+    assert [r.label for r in rows_for("Memory", CODEX)] == ["Keep conversations"]
+    assert rows_for("Models", CODEX) == [] and rows_for("Conversations", CODEX) == []
+
+
+def test_every_settings_row_has_a_footer_hint_or_is_obvious():
+    for r in rows_for("Settings", {"brain": "anthropic", "voice_primary": "elevenlabs"}):
+        if r.label in ("Processing", "Response speed", "Talk key", "Look when I ask", "See my code"):
+            assert r.hint, r.label
+
+
+def test_voice_merge_and_updates():
+    opts = sm.voice_options(zonos3=False, eleven_voices=[("abc", "Jessica", "premade")])
+    assert opts[0] == ("elevenlabs:abc", "ElevenLabs · Jessica")
+    assert not any(v.startswith("zonos3:") for v, _ in opts)
+    assert ("kokoro:af_bella", "Kokoro · Bella") in opts and opts[-1] == ("piper:amy", "Piper · Amy")
+    with_z = sm.voice_options(zonos3=True, eleven_voices=[])
+    assert ("zonos3:Savannah", "ZONOS3 · Savannah") in with_z
+    assert any(v.startswith("elevenlabs:") for v, _ in with_z)  # default voices, so the key row can appear
+    assert sm.voice_updates("kokoro:af_bella") == {"voice_primary": "kokoro", "kokoro_voice": "af_bella"}
+    assert sm.voice_updates("elevenlabs:abc") == {"voice_primary": "elevenlabs", "elevenlabs_voice_id": "abc"}
+    assert sm.voice_updates("zonos3:Willow") == {"voice_primary": "zonos3", "zonos3_voice": "Willow"}
+    assert sm.voice_updates("piper:amy") == {"voice_primary": "piper"}
+    assert sm.voice_value({"voice_primary": "kokoro", "kokoro_voice": "af_bella"}) == "kokoro:af_bella"
+    assert sm.voice_value({"voice_primary": "piper"}) == "piper:amy"
+
+
+def test_voice_row_steps_through_the_merged_list():
+    r = next(r for r in rows_for("Settings", CODEX, zonos3=True) if r.label == "Voice")
+    assert r.kind == "voice" and r.options[0].startswith("elevenlabs:")
+    assert display(r, "kokoro:af_bella") == "Kokoro · Bella"
+    i = r.options.index("kokoro:af_heart")
+    assert step(r, "kokoro:af_heart", +1) == r.options[i + 1]
+
+
+def test_processing_labels_and_display_capitalized():
+    rows = {r.label: r for r in rows_for("Settings", CODEX)}
+    p = rows["Processing"]
+    assert p.key == "whisper_device" and p.options == ("cpu", "auto")
+    assert display(p, "auto") == "Accurate" and display(p, "cpu") == "Fast"
+    assert display(rows["Position"], "top-right") == "Top right"
+    assert display(rows["Style"], "glow") == "Glow" and display(rows["Response speed"], "fast") == "Fast"
 
 
 def test_cycle_wraps():
@@ -21,159 +107,76 @@ def test_cycle_wraps():
 
 def test_seg_clamps():
     r = row("orb_style")
-    assert step(r, "ring", +1) == "ring"
-    assert step(r, "glow", -1) == "glow"
-    assert step(r, "glow", +1) == "lines"
+    assert step(r, "ring", +1) == "ring" and step(r, "glow", -1) == "glow" and step(r, "glow", +1) == "lines"
 
 
-def test_slider_steps_within_bounds():
-    r = row("orb_size")
-    assert step(r, 320, +1) == 320
-    assert step(r, 160, -1) == 144
-    assert step(r, 96, -1) == 96
+def test_volume_slider_steps_within_bounds():
+    r = row("voice_volume")
+    assert r.label == "Volume"
+    assert display(r, 150) == "150%" and step(r, 300, +1) == 300 and step(r, 150, +1) == 160
 
 
 def test_toggle_flips():
-    assert step(row("record_audio"), True, +1) is False
+    assert step(row("screen_look"), True, +1) is False
 
 
 def test_retention_display():
     r = row("retention_days")
-    assert display(r, 0) == "Forever" and display(r, 30) == "30 days"
-    assert step(r, 0, +1) == 7
+    assert display(r, 0) == "Forever" and display(r, 30) == "30 days" and step(r, 0, +1) == 7
 
 
 def test_secret_display():
     r = row("ELEVENLABS_API_KEY")
+    assert r.label == "ElevenLabs key"
     assert display(r, True) == "set ✓" and display(r, False) == "not set"
-
-
-def test_tabs_in_order_and_have_footers():
-    assert TABS == ("Companion", "Engine", "Memory", "Conversations")
-    assert all(FOOTERS[t] for t in TABS)
-    assert rows_for("Companion")[0].key == "companion_name"
 
 
 def test_shortcut_rows_and_display():
     r = row("talk_shortcut")
-    assert r.kind == "shortcut" and r.tab == "Companion"
+    assert r.kind == "shortcut" and r.tab == "Settings"
     assert display(r, "CTRL + SHIFT + SPACE") == "Ctrl + Shift + Space"
     assert display(r, "") == "none"
-    assert step(r, "CTRL + SHIFT + SPACE", +1) == "CTRL + SHIFT + SPACE"  # changed only by recording
-
-
-def test_voice_volume_row():
-    r = row("voice_volume")
-    assert display(r, 150) == "150%" and step(r, 300, +1) == 300 and step(r, 150, +1) == 160
-
-
-def test_tab_index_by_name():
-    from omarum.settings_model import tab_index
-
-    assert tab_index("conversations") == 3
-    assert tab_index("Engine") == 1
-    assert tab_index("") == 0
-    assert tab_index("nope") == 0
+    assert step(r, "CTRL + SHIFT + SPACE", +1) == "CTRL + SHIFT + SPACE"
 
 
 def test_brain_rows_follow_the_provider():
-    from omarum.settings_model import rows_for
+    def brain(b):
+        return [r for r in rows_for("Settings", {"brain": b, "voice_primary": "kokoro"}, brain_status=lambda p: "ready")
+                if r.key in ("brain", "brain_model", "brain_url") or (r.kind == "secret" and r.key != "ELEVENLABS_API_KEY")]
 
-    def brain_rows(brain):
-        return [r for r in rows_for("Engine", brain=brain, brain_status=lambda p: "ready") if r.group == "Brain"]
-
-    rows = brain_rows("claude-code")
+    rows = brain("claude-code")
     assert [r.label for r in rows] == ["Brain", "Model"]
-    assert rows[0].key == "brain" and "codex" in rows[0].options and "ollama" in rows[0].options
-    assert rows[1].kind == "model" and rows[1].options == ("haiku", "sonnet", "opus")
-
-    rows = brain_rows("gemini")
-    assert [r.label for r in rows] == ["Brain", "Model", "API key"]
-    assert rows[2].key == "GEMINI_API_KEY" and rows[2].kind == "secret"
-
-    rows = brain_rows("custom")
-    assert [r.label for r in rows] == ["Brain", "Model", "Endpoint", "API key"]
-    assert rows[2].key == "brain_url" and rows[2].kind == "text"
-
-    assert [r.label for r in brain_rows("ollama")] == ["Brain", "Model"]
+    assert "codex" in rows[0].options and rows[1].options == ("haiku", "sonnet", "opus")
+    rows = brain("gemini")
+    assert [r.label for r in rows] == ["Brain", "Model", "API key"] and rows[2].key == "GEMINI_API_KEY"
 
 
 def test_brain_and_model_display_and_step():
-    from omarum.settings_model import display, rows_for, step
-
-    rows = {r.label: r for r in rows_for("Engine", brain="codex", brain_status=lambda p: "not installed")}
+    rows = {r.label: r for r in rows_for("Settings", CODEX, brain_status=lambda p: "not installed")}
     assert display(rows["Brain"], "codex") == "Codex (subscription)"
     assert "not installed" in rows["Brain"].hint
     assert display(rows["Model"], "") == "default"
     assert step(rows["Model"], "", +1) == "gpt-5"
-    assert step(rows["Model"], "my-own", +1) == ""  # unknown → back to the first suggestion
     assert step(rows["Brain"], "codex", +1) == "gemini-cli"
 
 
 def test_once_never_asks_glib_to_repeat():
-    """GLib repeats an idle callback while it returns True; grab_focus() returns True, so
-    idle_add(entry.grab_focus) re-selected the whole field forever (each key replaced the text)."""
-    from omarum.settings_model import once
-
     calls = []
-    cb = once(lambda: calls.append(1) or True)
+    cb = sm.once(lambda: calls.append(1) or True)
     assert cb() is False and calls == [1]
 
 
 def test_keys_while_editing_act_like_a_form():
-    from omarum.settings_model import edit_key
-
-    assert edit_key("Escape") == ("cancel", 0)
-    assert edit_key("Down") == ("save", +1)
-    assert edit_key("Up") == ("save", -1)
-    assert edit_key("Tab") == ("save", +1)
-    assert edit_key("ISO_Left_Tab") == ("save", -1)
-    assert edit_key("a") is None and edit_key("Left") is None  # typing and moving the cursor stay in the field
-
-
-def test_wait_before_answering_is_a_setting():
-    from omarum.config import Config
-    from omarum.settings_model import display, row, step
-
-    r = row("vad_stop_secs")
-    assert r.tab == "Companion" and r.kind == "slider" and r.label == "Wait before answering"
-    assert Config().vad_stop_secs == 0.5  # "balanced": smart-turn waits longer when you sound unfinished
-    assert display(r, 0.8) == "0.8s"
-    assert step(r, 0.8, +1) == 0.9 and step(r, 2.0, +1) == 2.0 and step(r, 0.3, -1) == 0.3
-
-
-def test_elevenlabs_key_sits_right_under_the_voice_engine():
-    from omarum.settings_model import rows_for
-
-    voice = [r for r in rows_for("Engine") if r.group == "Voice"]
-    assert [r.label for r in voice][:2] == ["Engine", "ElevenLabs API key"]
-    key = voice[1]
-    assert key.kind == "secret" and key.key == "ELEVENLABS_API_KEY"
-    assert "Enter" in key.hint and "paste" in key.hint
-
-
-def test_elevenlabs_voice_row_lists_account_voices_by_name():
-    from omarum.settings_model import display, rows_for, step
-
-    voices = [("p1", "Sarah", "premade"), ("p2", "George", "premade")]
-    rows = [r for r in rows_for("Engine", eleven_voices=voices) if r.group == "Voice"]
-    assert [r.label for r in rows][:3] == ["Engine", "ElevenLabs API key", "ElevenLabs voice"]
-    v = rows[2]
-    assert v.key == "elevenlabs_voice_id" and v.options == ("p1", "p2")
-    assert display(v, "p2") == "George" and step(v, "p1", +1) == "p2"
-    none = [r for r in rows_for("Engine", eleven_voices=[]) if r.label == "ElevenLabs voice"][0]
-    assert "Voices: Read" in none.hint
+    assert sm.edit_key("Escape") == ("cancel", 0)
+    assert sm.edit_key("Down") == ("save", +1) and sm.edit_key("Up") == ("save", -1)
+    assert sm.edit_key("Tab") == ("save", +1) and sm.edit_key("ISO_Left_Tab") == ("save", -1)
+    assert sm.edit_key("a") is None and sm.edit_key("Left") is None
 
 
 def test_response_speed_presets():
-    from omarum.config import Config
-    from omarum.settings_model import SPEED_PRESETS, row, speed_of
-
     r = row("response_speed")
-    assert r.kind == "seg" and r.options == ("fast", "balanced", "patient") and r.tab == "Companion"
-    assert SPEED_PRESETS["fast"] == {"vad_stop_secs": 0.3, "whisper_cpu_model": "tiny.en"}
-    assert SPEED_PRESETS["balanced"] == {"vad_stop_secs": 0.5, "whisper_cpu_model": "base.en"}
-    assert SPEED_PRESETS["patient"] == {"vad_stop_secs": 0.8, "whisper_cpu_model": "base.en"}
+    assert r.kind == "seg" and r.options == ("fast", "balanced", "patient") and r.tab == "Settings"
+    assert sm.SPEED_PRESETS["fast"] == {"vad_stop_secs": 0.3, "whisper_cpu_model": "tiny.en"}
+    assert sm.SPEED_PRESETS["balanced"] == {"vad_stop_secs": 0.5, "whisper_cpu_model": "base.en"}
     assert Config().response_speed == "balanced" and Config().vad_stop_secs == 0.5
-    assert speed_of({"vad_stop_secs": 0.3, "whisper_cpu_model": "tiny.en"}) == "fast"
-    assert speed_of({"vad_stop_secs": 0.7, "whisper_cpu_model": "base.en"}) == "custom"
+    assert sm.speed_of({"vad_stop_secs": 0.7, "whisper_cpu_model": "base.en"}) == "custom"

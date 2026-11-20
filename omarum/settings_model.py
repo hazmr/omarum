@@ -6,17 +6,20 @@ from dataclasses import dataclass
 
 from omarum.brains import PROVIDERS
 
-TABS = ("Companion", "Engine", "Memory", "Conversations")
+TABS = ("Settings", "Models", "Memory", "Conversations")
+_OLD_TABS = {"companion": 0, "engine": 0}
 
 
 def tab_index(name: str) -> int:
-    """`omarum settings conversations` opens on that tab; anything else opens the first."""
+    """`omarum settings models` opens on that tab; old tab names and anything else open Settings."""
     names = [t.lower() for t in TABS]
-    return names.index(name.lower()) if name.lower() in names else 0
+    key = name.lower()
+    return names.index(key) if key in names else _OLD_TABS.get(key, 0)
+
 
 FOOTERS = {
-    "Companion": ["↑/↓ Select", "←/→ or Space Change", "Enter Edit", "Tab Next tab", "Q Close"],
-    "Engine": ["↑/↓ Select", "←/→ or Space Change", "Enter Edit", "Tab Next tab", "Q Close"],
+    "Settings": ["↑/↓ Select", "←/→ or Space Change", "Enter Edit", "Q Close"],
+    "Models": ["↑/↓ Select", "Enter Download / Cancel", "D Remove", "Q Close"],
     "Memory": ["↑/↓ Select", "←/→ Change", "Enter Open", "D Forget", "Q Close"],
     "Conversations": ["↑/↓ Select", "Enter Play", "Space Stop", "D Delete", "Q Close"],
 }
@@ -28,52 +31,40 @@ class Row:
     group: str
     label: str
     key: str | None
-    kind: str  # cycle | seg | toggle | slider | text | secret | shortcut | info | action | model
+    kind: str  # cycle | seg | toggle | slider | text | secret | shortcut | model | voice
     options: tuple = ()
-    hint: str = ""
+    hint: str = ""  # shown in the footer while the row is selected
     labels: tuple = ()  # (value, shown name) pairs, when values are ids
 
 
-ROWS: list[Row] = [
-    # Companion
-    Row("Companion", "Her", "Name", "companion_name", "text", hint="what you call your companion"),
-    Row("Companion", "Her", "Your name", "user_name", "text"),
-    Row("Companion", "Orb", "Style", "orb_style", "seg", ("glow", "lines", "ring")),
-    Row("Companion", "Orb", "Position", "orb_position", "cycle",
+ZONOS3_VOICES = ("Savannah", "Willow", "Imogen", "Wyatt", "Rupert", "Cillian", "Jett")
+KOKORO_VOICES = ("af_heart", "af_bella", "af_nicole", "bf_emma", "am_michael", "bm_george")
+
+_NAME = Row("Settings", "General", "Name", "companion_name", "text", hint="what you call your companion")
+_YOU = Row("Settings", "General", "Your name", "user_name", "text")
+_ELEVEN_KEY = Row("Settings", "Voice", "ElevenLabs key", "ELEVENLABS_API_KEY", "secret",
+                  hint="Enter, paste your key (starts with sk_), Enter · elevenlabs.io → Profile → API keys")
+_VOLUME = Row("Settings", "Voice", "Volume", "voice_volume", "slider", (50, 300, 10, "%"))
+_AFTER_VOICE = [
+    Row("Settings", "Speech to text", "Processing", "whisper_device", "seg", ("cpu", "auto"),
+        hint="Fast: small model on the CPU · Accurate: Large v3 Turbo on your GPU",
+        labels=(("cpu", "Fast"), ("auto", "Accurate"))),
+    Row("Settings", "Talking", "Response speed", "response_speed", "seg", ("fast", "balanced", "patient"),
+        hint="Fast answers sooner · Patient waits longer · hold Space to always finish"),
+    Row("Settings", "Talking", "Talk key", "talk_shortcut", "shortcut",
+        hint="double tap: open / close · hold: talk   (Enter to change)"),
+    Row("Settings", "Orb", "Style", "orb_style", "seg", ("glow", "lines", "ring")),
+    Row("Settings", "Orb", "Position", "orb_position", "cycle",
         ("top-right", "top-center", "top-left", "center", "bottom-center")),
-    Row("Companion", "Orb", "Colors", "orb_colors", "cycle", ("classic", "theme", "warm", "glass", "mono"),
-        hint="classic: orange = you, blue = Rum, gray = idle (mic off)"),
-    Row("Companion", "Orb", "Size", "orb_size", "slider", (96, 320, 16, "px")),
-    Row("Companion", "Conversation", "Response speed", "response_speed", "seg", ("fast", "balanced", "patient"),
-        hint="fast answers sooner · patient waits longer before answering · hold Space to always finish"),
-    Row("Companion", "Conversation", "Wait before answering", "vad_stop_secs", "slider", (0.3, 2.0, 0.1, "s"),
-        hint="how long you can pause mid-sentence before Rum replies"),
-    Row("Companion", "Conversation", "Ends after silence", "idle_timeout_secs", "slider", (4, 30, 2, "s")),
-    Row("Companion", "Conversation", "Words needed to interrupt", "interrupt_min_words", "slider", (1, 6, 1, "")),
-    Row("Companion", "Conversation", "Mute mic while talking", "mute_while_speaking", "toggle",
-        hint="stops your companion hearing itself through the speakers"),
-    Row("Companion", "Awareness", "Look at my screen when I ask", "screen_look", "toggle",
-        hint="\"look at my screen\", \"what do you see?\": one screenshot, sent to your brain"),
-    Row("Companion", "Awareness", "See the code you're looking at", "screen_awareness", "toggle",
-        hint="when you talk with IntelliJ or VS Code focused, Rum reads that file (sent to your brain)"),
-    Row("Companion", "Shortcuts", "Talk key", "talk_shortcut", "shortcut",
-        hint="double tap: open / close · hold: talk, let go and Rum answers   (Enter to change the keys)"),
-    # Engine
-    Row("Engine", "Voice", "Engine", "voice_primary", "seg", ("elevenlabs", "zonos3", "kokoro"),
-        hint="falls back down this order if it fails"),
-    Row("Engine", "Voice", "ElevenLabs API key", "ELEVENLABS_API_KEY", "secret",
-        hint="Enter, paste your key, Enter · from elevenlabs.io → Profile → API keys"),
-    Row("Engine", "Voice", "ZONOS3 voice", "zonos3_voice", "cycle",
-        ("Savannah", "Willow", "Imogen", "Wyatt", "Rupert", "Cillian", "Jett")),
-    Row("Engine", "Voice", "Kokoro voice", "kokoro_voice", "cycle",
-        ("af_heart", "af_bella", "af_nicole", "bf_emma", "am_michael", "bm_george")),
-    Row("Engine", "Voice", "Voice volume", "voice_volume", "slider", (50, 300, 10, "%")),
-    Row("Engine", "Ears", "Whisper device", "whisper_device", "seg", ("auto", "cuda", "cpu")),
-    # Memory
-    Row("Memory", "Privacy", "Save recording audio", "record_audio", "toggle"),
-    Row("Memory", "Privacy", "Keep conversations", "retention_days", "cycle", (0, 7, 30, 90, 365)),
-    Row("Memory", "Privacy", "Export everything", None, "action", hint="a .tar.gz in your home folder"),
+    Row("Settings", "Screen", "Look when I ask", "screen_look", "toggle",
+        hint="\"look at my screen\": one screenshot, sent to your brain"),
+    Row("Settings", "Screen", "See my code", "screen_awareness", "toggle",
+        hint="with IntelliJ or VS Code focused, Rum reads that file (sent to your brain)"),
 ]
+_MEMORY = [Row("Memory", "Conversations", "Keep conversations", "retention_days", "cycle", (0, 7, 30, 90, 365))]
+
+# Every fixed row (brain and voice rows depend on the current settings; see rows_for).
+ROWS: list[Row] = [_NAME, _YOU, _ELEVEN_KEY, _VOLUME, *_AFTER_VOICE, *_MEMORY]
 
 
 def row(key: str) -> Row:
@@ -81,54 +72,86 @@ def row(key: str) -> Row:
 
 
 def brain_rows(brain: str, brain_status=None) -> list[Row]:
-    """The Brain group for the chosen provider: which brain, its model, and what it needs."""
+    """The brain rows for the chosen provider: which brain, then only what it needs."""
     p = PROVIDERS.get(brain, PROVIDERS["claude-code"])
     state = brain_status(p) if brain_status else ""
     if p.kind == "cli" and state == "ready":
         state = "installed (log in to it once: " + p.login_hint + ")"
     how = "your own logged-in CLI" if p.kind == "cli" else ("runs on this computer" if p.group == "Local" else "your API key")
-    rows = [
-        Row("Engine", "Brain", "Brain", "brain", "cycle", tuple(PROVIDERS),
-            hint=f"{how}" + (f" · {state}" if state else "") + (f" · then: {p.login_hint}" if p.kind == "cli" and state not in ("", "ready") else "")),
-        Row("Engine", "Brain", "Model", "brain_model", "model", tuple(m for m in p.models) or ("",),
-            hint="←/→ suggestions · Enter to type any model name"),
-    ]
+    rows = [Row("Settings", "General", "Brain", "brain", "cycle", tuple(PROVIDERS),
+                hint=f"{how}" + (f" · {state}" if state else "")
+                + (f" · then: {p.login_hint}" if p.kind == "cli" and state not in ("", "ready") else ""))]
+    if len(p.models) > 1:
+        rows.append(Row("Settings", "General", "Model", "brain_model", "model", tuple(p.models),
+                        hint="←/→ suggestions · Enter to type any model name"))
     if p.id == "custom":
-        rows.append(Row("Engine", "Brain", "Endpoint", "brain_url", "text",
+        rows.append(Row("Settings", "General", "Endpoint", "brain_url", "text",
                         hint="an OpenAI-compatible URL, e.g. http://localhost:1234/v1"))
     if p.env_key:
-        rows.append(Row("Engine", "Brain", "API key", p.env_key, "secret",
+        rows.append(Row("Settings", "General", "API key", p.env_key, "secret",
                         hint=f"{p.env_key} · Enter to set, empty to remove" + (" (optional)" if p.id == "custom" else "")))
     return rows
 
 
-def eleven_voice_row(voices: list, status: str = "") -> Row:
-    """Pick from the voices this ElevenLabs account has (ids underneath, names on screen)."""
-    if not voices:
-        return Row("Engine", "Voice", "ElevenLabs voice", "elevenlabs_voice_id", "cycle", ("",),
-                   hint=status or "paste a key with the 'Voices: Read' permission to see your voices",
-                   labels=(("", "—"),))
-    return Row("Engine", "Voice", "ElevenLabs voice", "elevenlabs_voice_id", "cycle",
-               tuple(v[0] for v in voices), hint=status or "←/→ your ElevenLabs voices",
-               labels=tuple((v[0], v[1]) for v in voices))
+def _kokoro_name(v: str) -> str:
+    return v.split("_", 1)[-1].capitalize()
 
 
-def rows_for(tab: str, brain: str = "claude-code", brain_status=None, eleven_voices=None,
-             eleven_status: str = "") -> list[Row]:
-    rows = [r for r in ROWS if r.tab == tab]
-    if tab != "Engine":
-        return rows
-    out: list[Row] = []
-    for r in rows:
-        out.append(r)
-        if r.key == "ELEVENLABS_API_KEY":
-            out.append(eleven_voice_row(eleven_voices or [], eleven_status))
-    return brain_rows(brain, brain_status) + out
+def voice_options(zonos3: bool, eleven_voices, kokoro_voices=KOKORO_VOICES,
+                  zonos3_voices=ZONOS3_VOICES) -> list[tuple[str, str]]:
+    """Every voice of every engine, as ("engine:voice", "Engine · Name"), in fallback order."""
+    from omarum.elevenlabs import DEFAULT_VOICES
+
+    eleven = list(eleven_voices or []) or DEFAULT_VOICES
+    out = [(f"elevenlabs:{v[0]}", f"ElevenLabs · {v[1]}") for v in eleven]
+    if zonos3:
+        out += [(f"zonos3:{v}", f"ZONOS3 · {v}") for v in zonos3_voices]
+    out += [(f"kokoro:{v}", f"Kokoro · {_kokoro_name(v)}") for v in kokoro_voices]
+    out.append(("piper:amy", "Piper · Amy"))
+    return out
+
+
+_VOICE_KEYS = {"elevenlabs": "elevenlabs_voice_id", "zonos3": "zonos3_voice", "kokoro": "kokoro_voice"}
+
+
+def voice_value(values: dict) -> str:
+    engine = values.get("voice_primary", "kokoro")
+    if engine == "piper":
+        return "piper:amy"
+    return f"{engine}:{values.get(_VOICE_KEYS.get(engine, ''), '')}"
+
+
+def voice_updates(choice: str) -> dict:
+    engine, _, voice = choice.partition(":")
+    out = {"voice_primary": engine}
+    if engine in _VOICE_KEYS:
+        out[_VOICE_KEYS[engine]] = voice
+    return out
+
+
+def rows_for(tab: str, values: dict | None = None, brain_status=None, eleven_voices=None,
+             zonos3: bool = False) -> list[Row]:
+    values = values or {}
+    if tab == "Memory":
+        return list(_MEMORY)
+    if tab != "Settings":
+        return []
+    opts = voice_options(zonos3, eleven_voices)
+    voice = Row("Settings", "Voice", "Voice", "voice", "voice", tuple(v for v, _ in opts),
+                hint="every voice Rum has · a local voice not downloaded yet shows its size",
+                labels=tuple(opts))
+    rows = [_NAME, _YOU, *brain_rows(values.get("brain", "claude-code"), brain_status), voice]
+    if values.get("voice_primary") == "elevenlabs":
+        rows.append(_ELEVEN_KEY)
+    return rows + [_VOLUME, *_AFTER_VOICE]
 
 
 def display(r: Row, value) -> str:
     if r.labels:
-        return dict(r.labels).get(value, "default voice" if value else "—")
+        shown = dict(r.labels).get(value)
+        if shown:
+            return shown
+        return value.split(":", 1)[-1] if r.kind == "voice" and value else ("default voice" if value else "—")
     if r.key == "brain":
         p = PROVIDERS.get(value, PROVIDERS["claude-code"])
         return f"{p.label} ({p.group.lower()})"
@@ -145,6 +168,8 @@ def display(r: Row, value) -> str:
     if r.kind == "slider":
         unit = r.options[3]
         return f"{value:g}{unit}" if isinstance(value, float) else f"{value}{unit}"
+    if r.kind in ("seg", "cycle") and isinstance(value, str):
+        return value.replace("-", " ").capitalize()
     return str(value)
 
 
@@ -154,10 +179,10 @@ def step(r: Row, value, direction: int):
     if r.kind == "model":
         opts = r.options
         return opts[(opts.index(value) + direction) % len(opts)] if value in opts else opts[0]
-    if r.kind in ("cycle", "seg"):
+    if r.kind in ("cycle", "seg", "voice"):
         opts = r.options
         i = opts.index(value) if value in opts else 0
-        if r.kind == "cycle":
+        if r.kind in ("cycle", "voice"):
             return opts[(i + direction) % len(opts)]
         return opts[max(0, min(len(opts) - 1, i + direction))]
     if r.kind == "slider":
