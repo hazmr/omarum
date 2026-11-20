@@ -24,7 +24,7 @@ Scope {
     user: Qt.color(hex.user || "#cc8979"), companion: Qt.color(hex.companion || "#82c9ed"),
     idle: Qt.color(hex.idle || "#584e51"), error: Qt.color(hex.error || "#ee7350")
   })
-  readonly property var visibleStates: ["listening", "user_speaking", "thinking", "speaking", "error"]
+  readonly property var visibleStates: ["starting", "listening", "user_speaking", "thinking", "speaking", "error"]
   readonly property real voiceThreshold: 0.25  // omarum.orbstate.USER_VOICE_THRESHOLD
 
   // Animation state, advanced by the frame timer.

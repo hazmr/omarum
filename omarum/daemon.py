@@ -244,6 +244,7 @@ class Daemon:
             self._set_state("error", reason)
             return self._reply(ok=False)
         self._starting = True
+        self._set_state("starting")  # the orb appears now, while Rum wakes up
         try:
             # PyAudio write threads outlive a cancelled pipeline briefly; reopening ALSA
             # while one still writes to the closed stream segfaults (seen 2026-11-19).

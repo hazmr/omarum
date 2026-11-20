@@ -48,6 +48,8 @@ def voice_chain(cfg, available: set[str]) -> list[str]:
     if cfg.voice_primary not in ORDER:
         return [cfg.voice_primary]  # e.g. "piper": a manual choice, no chain
     chain = [v for v in ORDER[ORDER.index(cfg.voice_primary):] if v in available]
+    if len(chain) > 2 and chain[-1] == LAST_RESORT and "zonos3" in chain:
+        chain = chain[:-1]  # ZONOS3 already backs up the voice; loading Kokoro too cost ~1.3 s per start
     return chain or [LAST_RESORT]
 
 

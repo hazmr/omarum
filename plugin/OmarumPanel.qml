@@ -33,7 +33,7 @@ Panel {
   readonly property var colors: info.colors || ({ user: "#cc8979", companion: "#82c9ed", idle: "#584e51", error: "#ee7350" })
   readonly property string name: info.name || "Rum"
   readonly property var labels: ({
-    off: "starting", idle: "ready", closed: "ready", listening: "listening",
+    off: "starting", starting: "waking up", idle: "ready", closed: "ready", listening: "listening",
     user_speaking: "hearing you", thinking: "thinking", speaking: "talking", error: "something went wrong"
   })
 

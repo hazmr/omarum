@@ -547,3 +547,19 @@ async def test_bye_closes_even_if_rum_says_nothing():
     d._farewell_at -= 11  # ten seconds pass without a reply
     await asyncio.sleep(0.3)
     assert d.state == "closed"
+
+
+async def test_rum_shows_she_is_waking_up_right_away():
+    """Starting takes a moment; the orb must appear at once (state "starting"), not when ready."""
+    f = FakeFactory(build_delay=0.3)
+    d = make(f)
+    seen = []
+    d._set_state_orig = d._set_state
+
+    def spy(state, reason=None):
+        seen.append(state)
+        d._set_state_orig(state, reason)
+
+    d._set_state = spy
+    await d.handle({"cmd": "toggle"})
+    assert seen[:2] == ["starting", "listening"]

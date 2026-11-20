@@ -99,3 +99,20 @@ def test_cuda_libs_loadable_probe():
         raise OSError(f"{name}: cannot open shared object file")
 
     assert cuda_libs_loadable(loader=missing) is False
+
+
+def test_whisper_model_is_loaded_once_and_kept(monkeypatch):
+    from omarum import models
+
+    loads = []
+
+    class FakeWhisperModel:
+        def __init__(self, name, device, compute_type):
+            loads.append((name, device))
+
+    monkeypatch.setattr(models, "_WHISPER_CACHE", {})
+    first = models.cached_whisper_model("base.en", "cpu", "int8", loader=FakeWhisperModel)
+    again = models.cached_whisper_model("base.en", "cpu", "int8", loader=FakeWhisperModel)
+    assert first is again and loads == [("base.en", "cpu")]
+    models.cached_whisper_model("tiny.en", "cpu", "int8", loader=FakeWhisperModel)
+    assert len(loads) == 2

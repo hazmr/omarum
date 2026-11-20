@@ -10,7 +10,7 @@ ALL = {"elevenlabs", "zonos3", "kokoro"}
 
 
 def test_order_from_elevenlabs():
-    assert voice_chain(Config(voice_primary="elevenlabs"), ALL) == ["elevenlabs", "zonos3", "kokoro"]
+    assert voice_chain(Config(voice_primary="elevenlabs"), ALL) == ["elevenlabs", "zonos3"]  # Kokoro not needed behind ZONOS3
 
 
 def test_choosing_zonos3_skips_elevenlabs():
@@ -111,3 +111,14 @@ def test_elevenlabs_only_with_a_real_key_and_a_chosen_voice(monkeypatch):
     assert "elevenlabs" in available_voices(good, Config(elevenlabs_voice_id="v1"))
     assert "elevenlabs" not in available_voices({"ELEVENLABS_API_KEY": "0" * 64}, Config(elevenlabs_voice_id="v1"))  # a key ID
     assert "elevenlabs" not in available_voices(good, Config(elevenlabs_voice_id=""))  # no voice chosen
+
+
+def test_kokoro_is_left_out_when_zonos3_already_backs_up_the_voice():
+    """Loading Kokoro took ~1.3 s at every conversation start, for a voice almost never used."""
+    from omarum.config import Config
+    from omarum.voices import voice_chain
+
+    assert voice_chain(Config(voice_primary="elevenlabs"), {"elevenlabs", "zonos3", "kokoro"}) == ["elevenlabs", "zonos3"]
+    assert voice_chain(Config(voice_primary="elevenlabs"), {"elevenlabs", "kokoro"}) == ["elevenlabs", "kokoro"]
+    assert voice_chain(Config(voice_primary="kokoro"), {"elevenlabs", "zonos3", "kokoro"}) == ["kokoro"]
+    assert voice_chain(Config(voice_primary="zonos3"), {"zonos3", "kokoro"}) == ["zonos3", "kokoro"]

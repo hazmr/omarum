@@ -54,9 +54,20 @@ def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, C
 
     big_output_buffer(transport.output()._py_audio)  # no crackle when the machine is busy
 
+    from omarum.models import cached_whisper_model
+
+    class KeptWhisper(WhisperSTTService):
+        """Pipecat's Whisper, but the model stays loaded between conversations."""
+
+        def _load(self):
+            self._model = cached_whisper_model(self._settings.model, self._device, self._compute_type)
+            unsupported = self._unsupported_language()
+            if unsupported:
+                raise ValueError(unsupported)
+
     def whisper(model: str, device: str, compute: str) -> WhisperSTTService:
         logger.info(f"whisper: {model} on {device}")
-        return WhisperSTTService(
+        return KeptWhisper(
             settings=WhisperSTTService.Settings(
                 model=resolve_whisper_model(model), no_speech_prob=cfg.whisper_no_speech_prob
             ),

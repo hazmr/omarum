@@ -66,3 +66,16 @@ def make_stt(cfg, factory, cuda_devices: int | None = None, cuda_libs: bool | No
 
         logger.warning(f"whisper {model} doesn't fit on the GPU ({exc}); using {cfg.whisper_cpu_model} on the CPU")
         return factory(cfg.whisper_cpu_model, "cpu", "int8")
+
+
+_WHISPER_CACHE: dict = {}
+
+
+def cached_whisper_model(name: str, device: str, compute: str, loader=None):
+    """The faster-whisper model, loaded once and kept for every conversation (saves ~0.5 s per start)."""
+    key = (name, device, compute)
+    if key not in _WHISPER_CACHE:
+        if loader is None:
+            from faster_whisper import WhisperModel as loader
+        _WHISPER_CACHE[key] = loader(name, device=device, compute_type=compute)
+    return _WHISPER_CACHE[key]
