@@ -24,7 +24,10 @@ Scope {
   function bind() {
     if (bound && bound !== keys) unbind()
     if (!keys) return
-    eval_('local held = false\n'
+    // Unbind first: after a shell restart the old instance's binds are still in Hyprland, and two
+    // press binds made one press arrive twice (read as a double tap: open/close by accident).
+    eval_('pcall(hl.unbind, "' + keys + '")\n'
+      + 'local held = false\n'
       + 'hl.bind("' + keys + '", function() held = true; hl.dispatch(hl.dsp.global("omarum:talk-down")) end, '
       + '{ description = "Talk to Rum (hold) · open/close (tap tap) · stop Rum (tap)" })\n'
       + 'hl.bind("' + keys + '", function() if held then held = false; hl.dispatch(hl.dsp.global("omarum:talk-up")) end end, '

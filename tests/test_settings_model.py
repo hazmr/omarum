@@ -137,7 +137,7 @@ def test_wait_before_answering_is_a_setting():
 
     r = row("vad_stop_secs")
     assert r.tab == "Companion" and r.kind == "slider" and r.label == "Wait before answering"
-    assert Config().vad_stop_secs == 0.8  # a breath or "hmm" no longer ends your turn
+    assert Config().vad_stop_secs == 0.5  # "balanced": smart-turn waits longer when you sound unfinished
     assert display(r, 0.8) == "0.8s"
     assert step(r, 0.8, +1) == 0.9 and step(r, 2.0, +1) == 2.0 and step(r, 0.3, -1) == 0.3
 
@@ -163,3 +163,17 @@ def test_elevenlabs_voice_row_lists_account_voices_by_name():
     assert display(v, "p2") == "George" and step(v, "p1", +1) == "p2"
     none = [r for r in rows_for("Engine", eleven_voices=[]) if r.label == "ElevenLabs voice"][0]
     assert "Voices: Read" in none.hint
+
+
+def test_response_speed_presets():
+    from omarum.config import Config
+    from omarum.settings_model import SPEED_PRESETS, row, speed_of
+
+    r = row("response_speed")
+    assert r.kind == "seg" and r.options == ("fast", "balanced", "patient") and r.tab == "Companion"
+    assert SPEED_PRESETS["fast"] == {"vad_stop_secs": 0.3, "whisper_cpu_model": "tiny.en"}
+    assert SPEED_PRESETS["balanced"] == {"vad_stop_secs": 0.5, "whisper_cpu_model": "base.en"}
+    assert SPEED_PRESETS["patient"] == {"vad_stop_secs": 0.8, "whisper_cpu_model": "base.en"}
+    assert Config().response_speed == "balanced" and Config().vad_stop_secs == 0.5
+    assert speed_of({"vad_stop_secs": 0.3, "whisper_cpu_model": "tiny.en"}) == "fast"
+    assert speed_of({"vad_stop_secs": 0.7, "whisper_cpu_model": "base.en"}) == "custom"

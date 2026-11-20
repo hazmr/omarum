@@ -9,7 +9,7 @@ def test_defaults_when_file_missing(tmp_path: Path, monkeypatch):
     assert cfg.companion_name == "Rum"
     assert cfg.user_name == "Sam"
     assert cfg.brain_model == "haiku"
-    assert cfg.vad_stop_secs == 0.8
+    assert cfg.vad_stop_secs == 0.5
     assert cfg.idle_timeout_secs == 8.0
     assert cfg.orb_position == "top-right"
 

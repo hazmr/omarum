@@ -22,7 +22,7 @@ def test_vad_is_stricter_than_pipecat_defaults():
     assert p.confidence == 0.8
     assert p.start_secs == 0.3
     assert p.min_volume == 0.7
-    assert p.stop_secs == 0.8
+    assert p.stop_secs == 0.5
 
 
 def test_mic_muted_while_rum_speaks_by_default():

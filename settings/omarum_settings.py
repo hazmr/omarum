@@ -368,6 +368,11 @@ class Settings(Gtk.ApplicationWindow):
             self.save(it.row.key, new)
             if it.row.key == "elevenlabs_voice_id":
                 self.check_elevenlabs()
+            if it.row.key == "response_speed":  # a preset sets the wait and the speech model together
+                for key, value in sm.SPEED_PRESETS[new].items():
+                    self.save(key, value)
+            elif it.row.key in ("vad_stop_secs", "whisper_cpu_model"):
+                self.save("response_speed", sm.speed_of(self.values))
             if it.row.key == "brain":
                 self.save("brain_model", "")  # the old model name belongs to the old brain
         self.render()

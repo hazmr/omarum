@@ -35,7 +35,8 @@ class Config:
     kokoro_voice: str = "af_heart"
     piper_voice: str = "en_US-amy-medium"
     voice_volume: int = 150  # percent; Rum's voice is raised before the speakers (clipped, never distorted by wrap)
-    vad_stop_secs: float = 0.8  # "Wait before answering": silence before Rum even asks the smart-turn model if you're done
+    response_speed: str = "balanced"  # fast | balanced | patient: a preset for the two settings below
+    vad_stop_secs: float = 0.5  # "Wait before answering": silence before Rum asks the smart-turn model if you're done
     vad_confidence: float = 0.8
     vad_start_secs: float = 0.3
     vad_min_volume: float = 0.7
@@ -59,6 +60,7 @@ class Config:
 
 CHOICES: dict[str, tuple] = {
     "brain": tuple(PROVIDERS),
+    "response_speed": ("fast", "balanced", "patient", "custom"),
     "voice_primary": ("elevenlabs", "zonos3", "kokoro", "piper"),
     "orb_style": ("glow", "lines", "ring"),
     "orb_position": ("top-right", "top-center", "top-left", "center", "bottom-center"),

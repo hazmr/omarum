@@ -43,6 +43,8 @@ ROWS: list[Row] = [
         ("top-right", "top-center", "top-left", "center", "bottom-center")),
     Row("Companion", "Orb", "Colors", "orb_colors", "cycle", ("theme", "warm", "glass", "mono")),
     Row("Companion", "Orb", "Size", "orb_size", "slider", (96, 320, 16, "px")),
+    Row("Companion", "Conversation", "Response speed", "response_speed", "seg", ("fast", "balanced", "patient"),
+        hint="fast answers sooner · patient waits longer before answering · hold Space to always finish"),
     Row("Companion", "Conversation", "Wait before answering", "vad_stop_secs", "slider", (0.3, 2.0, 0.1, "s"),
         hint="how long you can pause mid-sentence before Rum replies"),
     Row("Companion", "Conversation", "Ends after silence", "idle_timeout_secs", "slider", (4, 30, 2, "s")),
@@ -180,3 +182,20 @@ EDIT_KEYS = {"Escape": ("cancel", 0), "Down": ("save", +1), "Up": ("save", -1),
 def edit_key(name: str):
     """What a key does while a text field is open: (action, move) or None (the field keeps it)."""
     return EDIT_KEYS.get(name)
+
+
+# "Response speed": each preset sets how long Rum waits after you stop talking (the smart-turn
+# model still waits longer when your sentence sounds unfinished) and which speech model runs.
+SPEED_PRESETS = {
+    "fast": {"vad_stop_secs": 0.3, "whisper_cpu_model": "tiny.en"},       # ~1 s sooner than patient
+    "balanced": {"vad_stop_secs": 0.5, "whisper_cpu_model": "base.en"},
+    "patient": {"vad_stop_secs": 0.8, "whisper_cpu_model": "base.en"},
+}
+
+
+def speed_of(values: dict) -> str:
+    """Which preset the current values match, or "custom"."""
+    for name, preset in SPEED_PRESETS.items():
+        if all(values.get(k) == v for k, v in preset.items()):
+            return name
+    return "custom"
