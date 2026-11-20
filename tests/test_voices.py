@@ -122,3 +122,37 @@ def test_kokoro_is_left_out_when_zonos3_already_backs_up_the_voice():
     assert voice_chain(Config(voice_primary="elevenlabs"), {"elevenlabs", "kokoro"}) == ["elevenlabs", "kokoro"]
     assert voice_chain(Config(voice_primary="kokoro"), {"elevenlabs", "zonos3", "kokoro"}) == ["kokoro"]
     assert voice_chain(Config(voice_primary="zonos3"), {"zonos3", "kokoro"}) == ["zonos3", "kokoro"]
+
+
+def test_a_broken_elevenlabs_key_is_skipped_not_silent(monkeypatch):
+    """A revoked key made every reply silent until three failures switched voices (2026-11-20)."""
+    from omarum import voicehealth, zonos3_tts
+    from omarum.config import Config
+    from omarum.voices import available_voices
+
+    monkeypatch.setattr(zonos3_tts, "is_installed", lambda: True)
+    monkeypatch.setattr(voicehealth, "_RESULTS", {})
+    env = {"ELEVENLABS_API_KEY": "sk_" + "a" * 48}
+    cfg = Config(voice_primary="elevenlabs", elevenlabs_voice_id="v1")
+    assert "elevenlabs" in available_voices(env, cfg)  # not checked yet: try it
+    voicehealth.check_elevenlabs(env, cfg, check=lambda k, v, m: "The ElevenLabs key is not valid")
+    assert "elevenlabs" not in available_voices(env, cfg)
+    assert voicehealth.reason(env, cfg) == "The ElevenLabs key is not valid"
+    new_env = {"ELEVENLABS_API_KEY": "sk_" + "b" * 48}  # a new, working key gets checked fresh
+    voicehealth.check_elevenlabs(new_env, cfg, check=lambda k, v, m: None)
+    assert "elevenlabs" in available_voices(new_env, cfg)
+
+
+def test_the_key_is_checked_once_per_key_and_voice(monkeypatch):
+    from omarum import voicehealth
+    from omarum.config import Config
+
+    monkeypatch.setattr(voicehealth, "_RESULTS", {})
+    calls = []
+    env = {"ELEVENLABS_API_KEY": "sk_x"}
+    cfg = Config(elevenlabs_voice_id="v1")
+    for _ in range(3):
+        voicehealth.check_elevenlabs(env, cfg, check=lambda k, v, m: calls.append(1))
+    assert len(calls) == 1
+    voicehealth.check_elevenlabs(env, Config(elevenlabs_voice_id="v2"), check=lambda k, v, m: calls.append(1))
+    assert len(calls) == 2

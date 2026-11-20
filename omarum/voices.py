@@ -37,7 +37,10 @@ def available_voices(env: dict[str, str], cfg=None) -> set[str]:
     # A real key starts with sk_ (a pasted key ID doesn't), and a voice must be chosen;
     # otherwise skip ElevenLabs instead of failing on every sentence.
     if key.startswith("sk_") and (cfg is None or getattr(cfg, "elevenlabs_voice_id", "")):
-        have.add("elevenlabs")
+        from omarum import voicehealth
+
+        if cfg is None or not voicehealth.known_broken(env, cfg):  # a key that was tested and failed: skip
+            have.add("elevenlabs")
     if zonos3_tts.is_installed():
         have.add("zonos3")
     return have

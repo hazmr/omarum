@@ -236,6 +236,23 @@ class Daemon:
                     await hold.release()
         return self._reply()
 
+    async def _check_voice(self, wait: float = 3.0) -> None:
+        """Is the ElevenLabs key good? Once per key and voice (instant after that); a broken key
+        is skipped instead of making every reply silent."""
+        if self.cfg.voice_primary != "elevenlabs":
+            return
+        from omarum import voicehealth
+
+        env = {**load_env_file(), **os.environ}
+        if not env.get("ELEVENLABS_API_KEY", "").strip().startswith("sk_"):
+            return
+        try:
+            why = await asyncio.wait_for(asyncio.to_thread(voicehealth.check_elevenlabs, env, self.cfg), wait)
+        except (asyncio.TimeoutError, Exception):
+            return  # unknown: try ElevenLabs as usual
+        if why:
+            logger.warning(f"ElevenLabs skipped: {why}")
+
     async def _start(self) -> dict:
         if self._starting or self._active:
             return self._reply()
@@ -245,6 +262,7 @@ class Daemon:
             return self._reply(ok=False)
         self._starting = True
         self._set_state("starting")  # the orb appears now, while Rum wakes up
+        await self._check_voice()
         try:
             # PyAudio write threads outlive a cancelled pipeline briefly; reopening ALSA
             # while one still writes to the closed stream segfaults (seen 2026-11-19).
@@ -343,6 +361,7 @@ async def run_daemon() -> None:
         from omarum.models import preload_whisper
 
         try:
+            await daemon._check_voice(wait=20)
             await asyncio.to_thread(preload_whisper, daemon.cfg)
         except Exception as exc:
             logger.warning(f"whisper preload failed (it loads at the first conversation): {exc}")
