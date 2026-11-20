@@ -338,6 +338,16 @@ async def run_daemon() -> None:
     daemon.on_startup(datetime.now())
     await hub.serve(SOCKET_PATH, daemon.handle)
     logger.info(f"omarum daemon listening on {SOCKET_PATH}")
+
+    async def _preload() -> None:  # the first conversation shouldn't wait for Whisper to load
+        from omarum.models import preload_whisper
+
+        try:
+            await asyncio.to_thread(preload_whisper, daemon.cfg)
+        except Exception as exc:
+            logger.warning(f"whisper preload failed (it loads at the first conversation): {exc}")
+
+    asyncio.create_task(_preload())
     # ZONOS3 keeps its model loaded in its own server; start it once with the daemon.
     zonos = zonos3_tts.start_server(cfg.zonos3_port) if cfg.voice_primary in ("elevenlabs", "zonos3") else None
     if zonos:

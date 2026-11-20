@@ -79,3 +79,9 @@ def cached_whisper_model(name: str, device: str, compute: str, loader=None):
             from faster_whisper import WhisperModel as loader
         _WHISPER_CACHE[key] = loader(name, device=device, compute_type=compute)
     return _WHISPER_CACHE[key]
+
+
+def preload_whisper(cfg, cuda_devices: int | None = None, cuda_libs: bool | None = None) -> None:
+    """Load the speech model when the engine starts, so even the first conversation opens fast."""
+    model, device, compute = pick_whisper(cfg, cuda_devices, cuda_libs)
+    cached_whisper_model(resolve_whisper_model(model), device, compute)

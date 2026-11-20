@@ -116,3 +116,13 @@ def test_whisper_model_is_loaded_once_and_kept(monkeypatch):
     assert first is again and loads == [("base.en", "cpu")]
     models.cached_whisper_model("tiny.en", "cpu", "int8", loader=FakeWhisperModel)
     assert len(loads) == 2
+
+
+def test_preload_loads_the_model_rum_will_use(monkeypatch):
+    from omarum import models
+    from omarum.config import Config
+
+    got = []
+    monkeypatch.setattr(models, "cached_whisper_model", lambda name, device, compute: got.append((name, device, compute)))
+    models.preload_whisper(Config(), cuda_devices=0, cuda_libs=False)
+    assert got == [(models.resolve_whisper_model("base.en"), "cpu", "int8")]
