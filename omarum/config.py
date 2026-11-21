@@ -26,6 +26,7 @@ class Config:
     whisper_model: str = "large-v3-turbo"
     whisper_device: str = "auto"  # auto | cuda | cpu
     whisper_cpu_model: str = "base.en"
+    talk_mode: str = "push_to_talk"  # push_to_talk: the mic is on only while Space is held · hands_free
     voice_primary: str = "elevenlabs"  # elevenlabs | zonos3 | kokoro | piper; falls back down that order
     elevenlabs_voice_id: str = "21m00Tcm4TlvDq8ikWAM"  # premade "Rachel"; change in config.toml
     elevenlabs_model: str = "eleven_flash_v2_5"
@@ -66,6 +67,7 @@ CHOICES: dict[str, tuple] = {
     "orb_position": ("top-right", "top-center", "top-left", "center", "bottom-center"),
     "orb_colors": ("classic", "theme", "warm", "glass", "mono"),
     "whisper_device": ("auto", "cuda", "cpu"),
+    "talk_mode": ("push_to_talk", "hands_free"),
 }
 
 

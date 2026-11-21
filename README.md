@@ -40,12 +40,14 @@ The first time it loads, Omarum sets up its Python environment and downloads the
 **Ctrl + Shift + Space** (you can keep Ctrl + Shift down the whole time; only Space counts):
 
 - **Double tap Space:** open Rum, or close her, in any state: listening, thinking or talking.
-- **Hold Space:** talk; let go and Rum answers. Holding while she talks stops her, and it's your turn.
+- **Hold Space:** talk; let go and Rum answers, and stops listening. Holding while she talks stops her, and it's your turn.
 - **One tap** never opens or closes her; while she's talking it just stops her.
 
 **Or just say goodbye:** "bye", "good night", "that's all", "talk to you later". She answers with a short goodbye and closes. A conversation also closes by itself after a few seconds of silence.
 
-**Hands-free** (talk without holding a key): right-click the orb in the bar, or use the switch in its panel.
+**Talk mode** (settings → Talking): **Push to talk** (the default) means Rum hears you only while you hold Space, so the room around you never reaches her. **Hands-free** keeps the mic on after a double tap. For one conversation, right-click the orb in the bar or use the switch in its panel to go hands-free.
+
+Background noise (fans, typing, the room) is filtered out of the mic before Rum listens, in both modes.
 
 **The orb in the bar:**
 - **Click:** the panel (hands-free switch, your brain and voice, your last conversation, settings).

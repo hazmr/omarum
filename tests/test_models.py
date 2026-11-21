@@ -155,3 +155,10 @@ def test_pick_whisper_falls_back_when_gpu_pack_missing():
     cfg = Config(whisper_device="auto")
     assert models.pick_whisper(cfg, cuda_devices=1, cuda_libs=False) == ("base.en", "cpu", "int8")
     assert models.pick_whisper(cfg, cuda_devices=1, cuda_libs=True)[1] == "cuda"
+
+
+def test_noise_filter_is_rnnoise():
+    from omarum.pipeline import noise_filter
+
+    f = noise_filter()
+    assert type(f).__name__ == "RNNoiseFilter"

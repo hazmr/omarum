@@ -12,6 +12,7 @@ def tap(p, t, open_, speaking=False):
 def test_double_tap_opens_when_closed():  # log 14:13:26: two taps while closed did nothing
     p = PushToTalk()
     assert tap(p, 0.0, False) == []
+    p.talk_mode = "hands_free"
     assert tap(p, 0.3, False) == ["mic_open", "start"] and p.mode == "hands_free"
 
 
@@ -109,3 +110,25 @@ def test_session_closed_elsewhere_resets():
 
 def test_release_without_press_does_nothing():
     assert PushToTalk().release(1.0) == []
+
+
+def test_push_to_talk_double_tap_opens_with_the_mic_off():
+    """Talk mode = Push to talk (the default): after a double tap the mic is on only while Space is held."""
+    p = PushToTalk()
+    p.talk_mode = "push_to_talk"
+    tap(p, 0.0, False)
+    assert tap(p, 0.3, False) == ["mic_close", "start"] and p.mode == "hold"
+    assert p.press(2.0, True, False) == ["hold_start", "mic_open"]
+    assert p.release(4.0) == ["hold_end", "mic_close"]  # let go: she stops listening
+
+
+def test_hands_free_talk_mode_keeps_the_mic_on():
+    p = PushToTalk()
+    p.talk_mode = "hands_free"
+    tap(p, 0.0, False)
+    p.talk_mode = "hands_free"
+    assert tap(p, 0.3, False) == ["mic_open", "start"] and p.mode == "hands_free"
+
+
+def test_push_to_talk_is_the_default():
+    assert PushToTalk().talk_mode == "push_to_talk"

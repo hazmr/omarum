@@ -37,6 +37,17 @@ from omarum.models import make_stt, resolve_whisper_model
 Emit = Callable[[dict], None]
 
 
+
+def noise_filter():
+    """RNNoise on the mic: cuts fans, typing and room noise before Rum listens. None if unavailable."""
+    try:
+        from pipecat.audio.filters.rnnoise_filter import RNNoiseFilter
+
+        return RNNoiseFilter()
+    except Exception as exc:  # pyrnnoise missing or broken: Rum still works, just without the filter
+        logger.warning(f"noise filter off: {exc}")
+        return None
+
 def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, Callable[[], Awaitable[None]], Session]:
     store = store or Store()
     store.ensure()
@@ -48,7 +59,8 @@ def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, C
     session.first_meeting = first_meeting
     transport = LocalAudioTransport(
         # 80 ms output chunks (default 40): fewer chances to run dry under load, which crackles.
-        LocalAudioTransportParams(audio_in_enabled=True, audio_out_enabled=True, audio_out_10ms_chunks=8)
+        LocalAudioTransportParams(audio_in_enabled=True, audio_out_enabled=True, audio_out_10ms_chunks=8,
+                                  audio_in_filter=noise_filter())
     )
     from omarum.volume import big_output_buffer
 

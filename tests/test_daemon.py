@@ -512,7 +512,7 @@ async def test_brain_without_key_errors_with_reason(monkeypatch):
 async def test_quick_tap_over_one_connection_is_a_tap_even_while_starting():
     """The plugin sends press and release on one socket; two quick taps are a double tap (opens)."""
     f = FakeFactory(build_delay=0.6)
-    d = make(f)
+    d = make(f, talk_mode="hands_free")
 
     async def tap():  # how the socket server delivers them: each command its own task, in order
         down = asyncio.create_task(d.handle({"cmd": "ptt_down"}))
@@ -574,3 +574,36 @@ async def test_a_close_during_startup_closes_once_started():
     await start
     await asyncio.sleep(0.2)
     assert d.state == "closed" and f.stops == 1
+
+
+async def test_push_to_talk_double_tap_opens_with_the_mic_closed():
+    """Talk mode = push to talk: Rum opens but hears nothing until Space is held."""
+    f = FakeFactory()
+    d = make(f, talk_mode="push_to_talk")
+
+    async def tap():
+        down = asyncio.create_task(d.handle({"cmd": "ptt_down"}))
+        await asyncio.sleep(0)
+        await d.handle({"cmd": "ptt_up"})
+        await down
+
+    await tap()
+    await tap()
+    await asyncio.sleep(0.8)
+    assert f.starts == 1 and d._ptt.mode == "hold" and d._mic_open is False
+
+
+async def test_hands_free_talk_mode_double_tap_keeps_the_mic_open():
+    f = FakeFactory()
+    d = make(f, talk_mode="hands_free")
+
+    async def tap():
+        down = asyncio.create_task(d.handle({"cmd": "ptt_down"}))
+        await asyncio.sleep(0)
+        await d.handle({"cmd": "ptt_up"})
+        await down
+
+    await tap()
+    await tap()
+    await asyncio.sleep(0.8)
+    assert f.starts == 1 and d._ptt.mode == "hands_free" and d._mic_open is True

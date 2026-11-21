@@ -28,3 +28,9 @@ def test_unknown_keys_ignored(tmp_path: Path):
     cfg = load_config(p)
     assert cfg.vad_stop_secs == 0.8
     assert not hasattr(cfg, "bogus")
+
+
+def test_talk_mode_defaults_to_push_to_talk():
+    from omarum.config import Config
+
+    assert Config().talk_mode == "push_to_talk"

@@ -182,6 +182,7 @@ class Daemon:
                 # Still down a moment from now? Then it's a hold (see PushToTalk.tick).
                 asyncio.get_running_loop().call_later(
                     TAP_SECS + 0.02, lambda: asyncio.ensure_future(self._ptt_act(self._ptt.tick(time.monotonic()))))
+                self._ptt.talk_mode = self.cfg.talk_mode  # what a double tap opens follows the setting
                 return await self._ptt_act(self._ptt.press(
                     time.monotonic(), open_=self._active or self._starting, speaking=self.state == "speaking"), "down")
             case "tap":  # the bar button and panel switch: hands-free on, or close

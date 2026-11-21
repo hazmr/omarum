@@ -35,7 +35,7 @@ def test_old_tab_names_open_settings():
 def test_settings_tab_has_13_rows_for_codex_with_zonos3_voice():
     got = labels(CODEX)
     assert got == ["Name", "Your name", "Brain", "Model", "Voice", "Volume", "Processing",
-                   "Response speed", "Talk key", "Style", "Position", "Look when I ask", "See my code"]
+                   "Talk mode", "Response speed", "Talk key", "Style", "Position", "Look when I ask", "See my code"]
     groups = []
     for r in rows_for("Settings", CODEX):
         if r.group not in groups:
@@ -214,3 +214,10 @@ def test_download_runs_the_code_next_to_the_window():
     argv, env = sm.download_command("/venv/bin/python", "/plugins/omarum.panel", "gpu", {"PATH": "/usr/bin"})
     assert argv == ["/venv/bin/python", "-m", "omarum.cli", "models", "download", "gpu"]
     assert env["PYTHONPATH"] == "/plugins/omarum.panel" and env["PATH"] == "/usr/bin"
+
+
+def test_talk_mode_row():
+    r = row("talk_mode")
+    assert r.kind == "seg" and r.options == ("push_to_talk", "hands_free") and r.group == "Talking"
+    assert display(r, "push_to_talk") == "Push to talk" and display(r, "hands_free") == "Hands-free"
+    assert "let go" in r.hint

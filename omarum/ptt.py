@@ -4,7 +4,9 @@
   listening, thinking, talking).
 - Hold Space: you talk; let go and Rum answers. Holding while Rum talks stops her.
 - A single tap only stops Rum if she's talking; it never opens or closes.
-- Hands-free (mic always on) is what a double tap opens; the bar orb / panel switch: toggle().
+- What a double tap opens follows Talk mode (settings): Push to talk (default) opens with the mic
+  off, so it hears you only while Space is held; Hands-free opens with the mic always on.
+  The bar orb / panel switch always means hands-free: toggle().
 
 Hyprland quirks this handles (seen in daemon.log): every release of Space arrives as an extra
 "down" plus the "up", and a very quick tap may arrive only as that pair. So taps are counted on
@@ -24,6 +26,7 @@ DOUBLE_SECS = 0.6  # two taps (release to release) within this: open / close
 class PushToTalk:
     def __init__(self) -> None:
         self.mode = "closed"
+        self.talk_mode = "push_to_talk"  # or "hands_free"; the daemon keeps it in step with the config
         self._down_at: float | None = None
         self._holding = False
         self._last_tap: float | None = None
@@ -69,8 +72,11 @@ class PushToTalk:
             return actions
         self._last_tap = None
         if self.mode == "closed":
-            self.mode = "hands_free"
-            return actions + ["mic_open", "start"]
+            if self.talk_mode == "hands_free":
+                self.mode = "hands_free"
+                return actions + ["mic_open", "start"]
+            self.mode = "hold"  # push to talk: open with the mic off; holding Space turns it on
+            return actions + ["mic_close", "start"]
         self.mode = "closed"
         return actions + ["stop"]
 
