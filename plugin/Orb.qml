@@ -158,15 +158,17 @@ Scope {
           var size = Math.min(width, height), c = size / 2
           var t = orb.t, e = orb.energy, col = orb.color
           var thinking = orb.engine.state === "thinking"
-          // Thinking: soft white, breathing deeply about every 1.6 s (swell and brighten, shrink and fade).
-          var breath = thinking ? 0.5 + 0.5 * Math.sin(t * 3.9) : 1
-          var alpha = orb.alpha * (orb.engine.state === "error" ? 0.6 + 0.4 * Math.sin(t * 2 * Math.PI) : 1)
-                      * (thinking ? 0.45 + 0.55 * breath : 1)
-          ctx.save()
-          if (thinking) {
-            var k = 0.78 + 0.22 * breath
-            ctx.translate(width / 2 * (1 - k), height / 2 * (1 - k)); ctx.scale(k, k)
+          // Thinking: soft white, breathing. A 4 s breath: in for 1.6 s, out for 2.4 s, eased like
+          // a person's. It starts in the core (it brightens first) and spreads outward, each layer
+          // swelling a little later; the surface moves at half speed. Nothing is scaled or zoomed.
+          function breathAt(tt) {
+            var p = ((tt % 4.0) + 4.0) % 4.0 / 4.0
+            return p < 0.4 ? 0.5 - 0.5 * Math.cos(Math.PI * p / 0.4)
+                           : 0.5 + 0.5 * Math.cos(Math.PI * (p - 0.4) / 0.6)
           }
+          var breath = thinking ? breathAt(t) : 0
+          var calm = thinking ? 0.5 : 1  // slower surface while she thinks
+          var alpha = orb.alpha * (orb.engine.state === "error" ? 0.6 + 0.4 * Math.sin(t * 2 * Math.PI) : 1)
           function rgba(a) { return Qt.rgba(col.r, col.g, col.b, a) }
           function path(pts, close) {
             ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1])
@@ -175,7 +177,7 @@ Scope {
           }
 
           var halo = ctx.createRadialGradient(c, c, size * 0.15, c, c, size * 0.47)
-          halo.addColorStop(0, rgba(0.18 * alpha)); halo.addColorStop(1, rgba(0))
+          halo.addColorStop(0, rgba((thinking ? 0.08 + 0.2 * breathAt(t - 0.6) : 0.18) * alpha)); halo.addColorStop(1, rgba(0))
           ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(c, c, size * 0.47, 0, 2 * Math.PI); ctx.fill()
 
           if (orb.style === "lines") {
@@ -184,8 +186,9 @@ Scope {
             ctx.strokeStyle = rgba(0.22 * alpha); ctx.lineWidth = 1.2; ctx.stroke(); ctx.clip()
             var radius = size * 0.42, stepX = size / 80
             for (var k = 0; k < 5; k++) {
-              var amp = (size * 0.04 + e * size * 0.44) * (1 - Math.abs(k - 2) / 5)
-              var freq = 1.6 + k * 0.35, phase = t * (1.2 + k * 0.25) + k, pts = []
+              var lift = thinking ? 0.06 + 0.22 * breathAt(t - Math.abs(k - 2) * 0.25) : e
+              var amp = (size * 0.04 + lift * size * 0.44) * (1 - Math.abs(k - 2) / 5)
+              var freq = 1.6 + k * 0.35, phase = t * calm * (1.2 + k * 0.25) + k, pts = []
               for (var x = -radius; x <= radius + 1e-9; x += stepX) {
                 var env = Math.pow(Math.cos(x / radius * Math.PI / 2), 2)
                 pts.push([c + x, c + Math.sin(x / radius * Math.PI * freq + phase) * amp * env])
@@ -195,7 +198,7 @@ Scope {
             }
             ctx.restore()
           } else if (orb.style === "ring") {
-            var rr = size * 0.34, ring = []
+            var rr = size * 0.34 * (thinking ? 0.92 + 0.12 * breath : 1), ring = []
             for (var i = 0; i <= 180; i++) {
               var a = i / 180 * 2 * Math.PI - Math.PI / 2
               var n = Math.sin(a * 8 + t * 4) * Math.sin(a * 3 - t * 2.2) + 0.5 * Math.sin(a * 13 + t * 6)
@@ -203,27 +206,29 @@ Scope {
               ring.push([c + Math.cos(a) * r, c + Math.sin(a) * r])
             }
             path(ring, true); ctx.strokeStyle = rgba(0.9 * alpha); ctx.lineWidth = 2; ctx.stroke()
-            ctx.beginPath(); ctx.arc(c, c, 3 + e * 3, 0, 2 * Math.PI); ctx.fillStyle = rgba(0.7 * alpha); ctx.fill()
+            ctx.beginPath(); ctx.arc(c, c, 3 + e * 3 + breath * 4, 0, 2 * Math.PI); ctx.fillStyle = rgba((0.7 + 0.3 * breath) * alpha); ctx.fill()
           } else {
-            var breathe = 1
             var base = size * 0.29
             for (var layer = 3; layer >= 0; layer--) {
-              var rb = base * (0.55 + layer * 0.12) * breathe * (1 + 0.04 * Math.sin(t * 1.3)) + e * size * 0.05
+              var lb = thinking ? breathAt(t - layer * 0.22) : 0  // outer layers breathe a moment later
+              var swell = thinking ? 0.9 + 0.16 * lb : 1
+              var rb = base * (0.55 + layer * 0.12) * swell * (1 + 0.04 * Math.sin(t * calm * 1.3)) + e * size * 0.05
               var blob = [], maxR = 0
               for (var j = 0; j <= 90; j++) {
                 var ang = j / 90 * 2 * Math.PI
-                var wob = Math.sin(ang * 3 + t * 1.7 + layer) * 0.5 + Math.sin(ang * 5 - t * 2.3 + layer * 2) * 0.35 + Math.sin(ang * 2 + t * 0.8) * 0.4
+                var tw = t * calm
+                var wob = Math.sin(ang * 3 + tw * 1.7 + layer) * 0.5 + Math.sin(ang * 5 - tw * 2.3 + layer * 2) * 0.35 + Math.sin(ang * 2 + tw * 0.8) * 0.4
                 var rad = rb + wob * (size * 0.0125 + e * size * 0.0625) * (1 + layer * 0.3)
                 maxR = Math.max(maxR, rad)
                 blob.push([c + Math.cos(ang) * rad, c + Math.sin(ang) * rad])
               }
               path(blob, true)
               var g = ctx.createRadialGradient(c, c - size * 0.04, 3, c, c, maxR * 1.2)
-              g.addColorStop(0, rgba((0.6 - layer * 0.1) * alpha)); g.addColorStop(1, rgba(0.04 * alpha))
+              var core = thinking ? (0.35 + 0.5 * lb) * (1 - layer * 0.12) : 0.6 - layer * 0.1  // brightens as she breathes in
+              g.addColorStop(0, rgba(core * alpha)); g.addColorStop(1, rgba(0.04 * alpha))
               ctx.fillStyle = g; ctx.fill()
             }
           }
-          ctx.restore()
         }
       }
     }
