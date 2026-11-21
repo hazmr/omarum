@@ -100,7 +100,7 @@ def test_thinking_has_its_own_color():
     from omarum.summary import summary
     from omarum.theme import PRESETS, _hex, palette_for
 
-    assert PRESETS["classic"]["thinking"] == _hex("#a78bfa")
+    assert PRESETS["classic"]["thinking"] == _hex("#e6e6ee")  # soft white (Hazem: no purple)
     s = summary(Config(orb_colors="classic"), [], date(2026, 11, 20), False, palette_for("classic"))
     assert set(s["colors"]) >= {"user", "companion", "idle", "thinking", "error"}
     assert s["colors"]["thinking"] not in (s["colors"]["user"], s["colors"]["companion"], s["colors"]["idle"])

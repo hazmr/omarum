@@ -23,7 +23,7 @@ Scope {
   readonly property var colors: ({
     user: Qt.color(hex.user || "#cc8979"), companion: Qt.color(hex.companion || "#82c9ed"),
     idle: Qt.color(hex.idle || "#584e51"), error: Qt.color(hex.error || "#ee7350"),
-    thinking: Qt.color(hex.thinking || "#a78bfa")
+    thinking: Qt.color(hex.thinking || "#e6e6ee")
   })
   readonly property var visibleStates: ["starting", "listening", "user_speaking", "thinking", "speaking", "error"]
   readonly property real voiceThreshold: 0.25  // omarum.orbstate.USER_VOICE_THRESHOLD
@@ -47,7 +47,7 @@ Scope {
     return s
   }
   // Idle, waiting, waking up: gray (lifted a little so a dark theme gray still shows). Orange only
-  // while you talk, blue only while Rum talks, violet breathing while she thinks.
+  // while you talk, blue only while Rum talks, soft white breathing while she thinks.
   readonly property color restColor: mix(colors.idle, Commons.Color.foreground, 0.25)
   function targetColor(s) {
     if (s === "user_speaking") return colors.user
@@ -158,8 +158,7 @@ Scope {
           var size = Math.min(width, height), c = size / 2
           var t = orb.t, e = orb.energy, col = orb.color
           var thinking = orb.engine.state === "thinking"
-          // Thinking: a deep breath about every 1.6 s (swell and brighten, shrink and fade),
-          // with three dots circling the orb (drawn at the end). No other state looks like it.
+          // Thinking: soft white, breathing deeply about every 1.6 s (swell and brighten, shrink and fade).
           var breath = thinking ? 0.5 + 0.5 * Math.sin(t * 3.9) : 1
           var alpha = orb.alpha * (orb.engine.state === "error" ? 0.6 + 0.4 * Math.sin(t * 2 * Math.PI) : 1)
                       * (thinking ? 0.45 + 0.55 * breath : 1)
@@ -225,15 +224,6 @@ Scope {
             }
           }
           ctx.restore()
-          if (thinking) {  // three dots chasing each other around the orb
-            for (var d = 0; d < 3; d++) {
-              var da = t * 2.6 - d * 0.45
-              var dr = size * 0.40
-              ctx.beginPath()
-              ctx.arc(c + Math.cos(da) * dr, c + Math.sin(da) * dr, size * (0.028 - d * 0.006), 0, 2 * Math.PI)
-              ctx.fillStyle = rgba(orb.alpha * (0.95 - d * 0.25)); ctx.fill()
-            }
-          }
         }
       }
     }
