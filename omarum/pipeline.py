@@ -32,11 +32,40 @@ from omarum.volume import Volume
 from omarum.recorder import Session, TranscriptTap
 from omarum.voices import available_voices, build_tts, load_env_file, voice_chain
 from omarum.turns import mute_strategies, turn_strategies, vad_params
-from omarum.models import make_stt, resolve_whisper_model
+from omarum.models import cached_whisper_model, make_stt, resolve_whisper_model
 
 Emit = Callable[[dict], None]
 
 
+
+
+class KeptWhisper(WhisperSTTService):
+    """Pipecat's Whisper, but the model stays loaded between conversations, and a GPU that runs
+    out of memory mid-conversation (another app filled it) hands over to the CPU model."""
+
+    def __init__(self, *args, fallback_model: str = "", **kwargs):
+        self._fallback_model = fallback_model
+        super().__init__(*args, **kwargs)
+
+    def _load(self):
+        self._model = cached_whisper_model(self._settings.model, self._device, self._compute_type)
+        unsupported = self._unsupported_language()
+        if unsupported:
+            raise ValueError(unsupported)
+
+    async def run_stt(self, audio: bytes):
+        try:
+            async for frame in super().run_stt(audio):
+                yield frame
+            return
+        except RuntimeError as exc:
+            if self._device != "cuda" or "out of memory" not in str(exc) or not self._fallback_model:
+                raise
+        logger.warning(f"whisper: the GPU is full (another app is using it); using {self._fallback_model} on cpu")
+        self._device, self._compute_type = "cpu", "int8"
+        self._model = cached_whisper_model(self._fallback_model, "cpu", "int8")
+        async for frame in super().run_stt(audio):
+            yield frame
 
 def noise_filter():
     """RNNoise on the mic: cuts fans, typing and room noise before Rum listens. None if unavailable."""
@@ -66,17 +95,6 @@ def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, C
 
     big_output_buffer(transport.output()._py_audio)  # no crackle when the machine is busy
 
-    from omarum.models import cached_whisper_model
-
-    class KeptWhisper(WhisperSTTService):
-        """Pipecat's Whisper, but the model stays loaded between conversations."""
-
-        def _load(self):
-            self._model = cached_whisper_model(self._settings.model, self._device, self._compute_type)
-            unsupported = self._unsupported_language()
-            if unsupported:
-                raise ValueError(unsupported)
-
     def whisper(model: str, device: str, compute: str) -> WhisperSTTService:
         logger.info(f"whisper: {model} on {device}")
         return KeptWhisper(
@@ -85,6 +103,7 @@ def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, C
             ),
             device=device,
             compute_type=compute,
+            fallback_model=resolve_whisper_model(cfg.whisper_cpu_model),
             ttfs_p99_latency=cfg.whisper_ttfs_p99,
         )
 

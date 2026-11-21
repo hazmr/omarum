@@ -162,3 +162,35 @@ def test_noise_filter_is_rnnoise():
 
     f = noise_filter()
     assert type(f).__name__ == "RNNoiseFilter"
+
+
+async def test_gpu_out_of_memory_falls_back_to_the_cpu_model(monkeypatch):
+    """Seen 2026-11-21 14:34: Superwhisper filled the GPU and Rum's transcription failed."""
+    import numpy as np
+
+    from omarum import pipeline
+    from pipecat.frames.frames import TranscriptionFrame
+
+    class Seg:
+        text, no_speech_prob = "hello there", 0.0
+
+    class OOM:
+        supported_languages = None
+
+        def transcribe(self, *a, **k):
+            raise RuntimeError("CUDA failed with error out of memory")
+
+    class CPU:
+        supported_languages = None
+
+        def transcribe(self, *a, **k):
+            return iter([Seg()]), None
+
+    loads = []
+    monkeypatch.setattr(pipeline, "cached_whisper_model",
+                        lambda name, device, compute: loads.append((name, device)) or (OOM() if device == "cuda" else CPU()))
+    stt = pipeline.KeptWhisper(settings=pipeline.WhisperSTTService.Settings(model="large-v3-turbo"),
+                               device="cuda", compute_type="int8_float16", fallback_model="base.en")
+    frames = [f async for f in stt.run_stt(np.zeros(16000, np.int16).tobytes())]
+    assert any(isinstance(f, TranscriptionFrame) and "hello there" in f.text for f in frames)
+    assert loads[-1] == ("base.en", "cpu") and stt._device == "cpu"
