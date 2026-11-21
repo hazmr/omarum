@@ -58,12 +58,19 @@ The first time it loads, Omarum sets up its Python environment and downloads the
 
 ## Settings
 
-Open settings with a middle-click on the orb. It's keyboard-first: **↑ ↓** to move, **← →** to change, **Enter** to edit, **Tab** for the next tab.
+Open settings with a middle-click on the orb. It's keyboard-first: **↑ ↓** to move, **← →** to change, **Enter** to edit, **Tab** for the next tab. The line at the bottom explains the row you're on.
 
-- **Companion:** names, the orb (style, position, colors, size), how long Rum waits before answering, the talk keys, and whether Rum may see your code and look at your screen.
-- **Engine:** the brain (provider, model, API key), the voice and its volume, and speech recognition.
+- **Settings:** names, the brain (and its key, only if it needs one), the voice (every voice of every engine in one list) and its volume, **Processing**, response speed, the talk key, the orb's style and position, and whether Rum may look at your screen or your code.
+- **Models:** every model Rum can download, with its size and state. **Enter** downloads it, or pauses a download (Enter again resumes where it stopped); **D** twice removes it. Downloads keep going if you close the window.
 - **Memory:** what Rum knows about you (forget any line), the journal, and how long conversations are kept.
 - **Conversations:** play back or delete past conversations.
+
+### Processing: Fast or Accurate
+
+How Rum turns your voice into text:
+
+- **Fast:** Whisper Base on the CPU. Works on any computer.
+- **Accurate:** Whisper Large v3 Turbo on an NVIDIA GPU. Much better with names and unusual words, and about half a second per sentence. It needs **GPU support** (581 MB, the NVIDIA cuBLAS libraries, downloaded into Omarum's own folder, no sudo); choosing Accurate downloads whatever is missing. Until it's ready, Rum uses Fast.
 
 ### Using ElevenLabs
 
@@ -95,6 +102,7 @@ This stops Rum, the orb and the shortcut. Your conversations, memory and setting
 - **Rum doesn't answer, or the panel shows a red message:** the message says why, for example "Codex is not logged in. Run: codex login" or "Gemini needs an API key".
 - **Rum can't see your code:** the editor must be the focused window when you speak, and the project should be one IntelliJ knows (or live in `~/Projects`, `~/IdeaProjects` or `~/Work`).
 - **Rum interrupts you:** hold Ctrl+Shift+Space while you talk (she waits until you let go), or set **Response speed** to *patient* in settings → Companion.
+- **Rum mishears you** (names, technical words): settings → **Processing → Accurate**. The log line `whisper: large-v3-turbo on cuda` means it's working; `Accurate needs GPU support` means the download isn't done yet, and an out-of-memory message means other apps are using the GPU.
 - **Rum takes long to answer:** set **Response speed** to *fast* in settings → Companion, or the brain's **Model** to `haiku` in settings → Engine.
 - **Logs:** `~/.local/state/omarum/daemon.log`
 

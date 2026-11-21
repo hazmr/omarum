@@ -40,11 +40,10 @@ def fetch(spec: FileSpec, dest: Path, on_bytes: Callable[[int], None], cancelled
         status = getattr(resp, "status", 200)
         length = int(resp.headers.get("Content-Length") or 0)
         if have and status != 206:  # the server ignored Range: start over, never append
+            on_bytes(-have)  # those bytes no longer count
             have = 0
         expected = spec.size or (have + length if length else 0)
         with open(part, "ab" if have else "wb") as out:
-            if have:
-                on_bytes(have)
             while True:
                 if cancelled():
                     raise Cancelled(spec.path)
@@ -88,7 +87,9 @@ def download(m: Model, models_dir: Path, files: list[FileSpec], emit: Callable[[
     todo = [f for f in files if not ((folder / f.path).is_file() and (folder / f.path).stat().st_size > 0)]
     sizes = [_size(f, opener) for f in todo]
     total = sum(sizes) or m.approx_bytes
-    done = 0
+    paused = [(folder / (f.path + ".part")).stat().st_size if (folder / (f.path + ".part")).exists() else 0
+              for f in todo]
+    done = sum(paused)  # a resume starts where it was paused, not at 0
     last = 0.0
 
     def report(force: bool = False) -> None:
@@ -101,9 +102,9 @@ def download(m: Model, models_dir: Path, files: list[FileSpec], emit: Callable[[
 
     try:
         report(force=True)
-        for f, size in zip(todo, sizes):
+        for f, size, had in zip(todo, sizes, paused):
             spec = f if f.size or not size else FileSpec(f.url, f.path, size, f.sha256)
-            base = done
+            base = done - had
 
             def on_bytes(n: int, base=base) -> None:
                 nonlocal done

@@ -114,3 +114,26 @@ def test_download_failure_is_recorded(server, tmp_path):
         downloader.download(m, tmp_path, list(m.files), seen.append, never)
     s = catalog.state(m, tmp_path)
     assert seen[-1]["state"] == "failed" and s["state"] == "failed" and s["error"]
+
+
+def test_resumed_download_starts_at_the_paused_bytes(server, tmp_path):
+    """Seen for real (Piper): a resume's first line said 0 bytes, so the window flashed 0%."""
+    m = Model(id="t", title="T", group="Voices", folder="t", files=(FileSpec(server + "/f", "f", 3000),),
+              approx_bytes=3000)
+    (tmp_path / "t").mkdir()
+    (tmp_path / "t" / "f.part").write_bytes(b"a" * 1000)
+    seen = []
+    downloader.download(m, tmp_path, list(m.files), seen.append, never)
+    assert seen[0]["done"] == 1000
+    assert all(e["done"] <= 3000 for e in seen) and seen[-1]["state"] == "ready"
+
+
+def test_restart_without_range_does_not_double_count(server, tmp_path):
+    Handler.ranges = False
+    m = Model(id="t", title="T", group="Voices", folder="t", files=(FileSpec(server + "/f", "f", 3000),),
+              approx_bytes=3000)
+    (tmp_path / "t").mkdir()
+    (tmp_path / "t" / "f.part").write_bytes(b"z" * 1000)
+    seen = []
+    downloader.download(m, tmp_path, list(m.files), seen.append, never)
+    assert max(e["done"] for e in seen) == 3000
