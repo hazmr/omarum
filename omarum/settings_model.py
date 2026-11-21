@@ -268,3 +268,32 @@ def download_command(python: str, code_root: str, model_id: str, environ: dict) 
     """`omarum models download <id>` with the engine's Python but the window's own code."""
     env = {**environ, "PYTHONPATH": str(code_root)}
     return [python, "-m", "omarum.cli", "models", "download", model_id], env
+
+
+_KEY_SITES = {
+    "ANTHROPIC_API_KEY": ("console.anthropic.com/settings/keys", "Create Key"),
+    "OPENAI_API_KEY": ("platform.openai.com/api-keys", "Create new secret key"),
+    "GEMINI_API_KEY": ("aistudio.google.com/apikey", "Create API key"),
+    "GROQ_API_KEY": ("console.groq.com/keys", "Create API Key"),
+    "OPENROUTER_API_KEY": ("openrouter.ai/keys", "Create Key"),
+    "DEEPSEEK_API_KEY": ("platform.deepseek.com/api_keys", "Create new API key"),
+    "MISTRAL_API_KEY": ("console.mistral.ai/api-keys", "Create new key"),
+    "XAI_API_KEY": ("console.x.ai", "API Keys → Create API key"),
+    "TOGETHER_API_KEY": ("api.together.ai/settings/api-keys", "Create API key"),
+}
+_PASTE = "3. Here: press Enter, paste the key, press Enter. Saved only on this computer (~/.config/omarum/env)."
+
+
+def key_help(key: str) -> list[str]:
+    """Step-by-step lines shown under a selected key row: where to get it, how to paste it."""
+    if key == "ELEVENLABS_API_KEY":
+        return ["1. elevenlabs.io → Profile → API keys → Create API key; turn on Text to Speech (and Voices: Read).",
+                "2. Copy the key from the box that appears: a real key starts with sk_ (the code in the list is only its ID).",
+                _PASTE,
+                "4. The line at the bottom says ✓ works, or what's wrong. Pick your voice in Voice."]
+    if key in _KEY_SITES:
+        site, button = _KEY_SITES[key]
+        return [f"1. Open {site} and sign in.", f"2. Click {button}, then copy the key (it's shown only once).", _PASTE]
+    if key == "OMARUM_CUSTOM_API_KEY":
+        return ["Only if your endpoint needs one: press Enter, paste the key, press Enter."]
+    return []

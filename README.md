@@ -81,6 +81,10 @@ How Rum turns your voice into text:
 3. In settings, pick an ElevenLabs voice in **Voice**; the **ElevenLabs key** row appears under it: press Enter, paste, press Enter.
 4. The bottom line shows "✓ works", or tells you in plain words what's wrong.
 
+### Using an API key for the brain
+
+Pick the brain in settings → **Brain** (Anthropic, OpenAI, Gemini, Groq, OpenRouter, DeepSeek, Mistral, xAI or Together). An **API key** row appears under it; select it and the window shows where to get that provider's key. Then press Enter, paste, press Enter. Keys are saved only on this computer, in `~/.config/omarum/env` (readable only by you). The command-line brains (Claude, Codex, Gemini CLI, Kimi, Qwen) need no key: log in to their own tool once.
+
 ### ZONOS3-Mini (optional local voice)
 
 Build it from [Zyphra/ZONOS3-Mini](https://github.com/Zyphra/ZONOS3-Mini) into `~/.local/share/omarum/engines/zonos3` (`cmake -B build-vulkan -DGGML_VULKAN=ON && cmake --build build-vulkan`, then `hf download Zyphra/ZONOS3-Mini` for the `gguf/` files). Rum uses it when it's there.

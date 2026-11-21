@@ -221,3 +221,15 @@ def test_talk_mode_row():
     assert r.kind == "seg" and r.options == ("push_to_talk", "hands_free") and r.group == "Talking"
     assert display(r, "push_to_talk") == "Push to talk" and display(r, "hands_free") == "Hands-free"
     assert "let go" in r.hint
+
+
+def test_key_help_says_where_to_get_each_key_and_how_to_paste_it():
+    eleven = sm.key_help("ELEVENLABS_API_KEY")
+    assert any("elevenlabs.io" in l for l in eleven) and any("sk_" in l for l in eleven)
+    assert any("Enter" in l and "paste" in l for l in eleven)
+    for key, site in (("ANTHROPIC_API_KEY", "console.anthropic.com"), ("OPENAI_API_KEY", "platform.openai.com"),
+                      ("GEMINI_API_KEY", "aistudio.google.com"), ("OPENROUTER_API_KEY", "openrouter.ai")):
+        lines = sm.key_help(key)
+        assert any(site in l for l in lines), key
+        assert any("Enter" in l and "paste" in l for l in lines), key
+    assert sm.key_help("NOT_A_KEY") == []

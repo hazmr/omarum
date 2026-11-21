@@ -43,8 +43,8 @@ def css(c: dict) -> str:
     .brand {{ color: {c['accent']}; padding: 0 20px 0 16px; }}
     .tab {{ color: {c['light_foreground']}; padding: 0 14px; border-bottom: 2px solid transparent; opacity: 0.6; }}
     .tab.on {{ color: {c['foreground']}; border-bottom-color: {c['accent']}; opacity: 1; }}
-    .group {{ color: {c['foreground']}; font-weight: bold; font-size: 11px; padding: 16px 0 6px 0; }}
-    .row {{ min-height: 28px; padding: 0 15px; }}
+    .group {{ color: {c['foreground']}; font-weight: bold; font-size: 11px; padding: 22px 0 8px 0; }}
+    .row {{ min-height: 28px; padding: 2px 15px; margin-bottom: 2px; }}
     .row.focus {{ background: alpha({c['selection']}, 0.45); }}
     .row.focus .label {{ color: {c['accent']}; }}
     .value {{ color: {c['light_foreground']}; }}
@@ -54,6 +54,7 @@ def css(c: dict) -> str:
     .seg.on {{ background: alpha({c['muted']}, 0.8); color: {c['foreground']}; border-color: {c['light_foreground']}; font-weight: bold; }}
     .hint {{ color: alpha({c['light_foreground']}, 0.5); font-size: 11px; }}
     .size {{ color: alpha({c['light_foreground']}, 0.6); }}
+    .keyhelp {{ padding: 4px 15px 10px 195px; }}
     .ok {{ color: #87a9b0; }} .bad {{ color: #c38b7b; }}
     .footer {{ border-top: 1px solid alpha({c['muted']}, 0.6); padding: 8px 16px; color: {c['light_foreground']}; font-size: 11px; }}
     entry {{ background: {c['background']}; color: {c['foreground']}; border: 1px solid {c['accent']}; border-radius: 0; min-height: 0; padding: 1px 6px; }}
@@ -121,7 +122,8 @@ class Settings(Gtk.ApplicationWindow):
         self.list = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.list.set_margin_start(20)
         self.list.set_margin_end(20)
-        self.list.set_margin_top(6)
+        self.list.set_margin_top(4)
+        self.list.set_margin_bottom(20)
         self.scroller = Gtk.ScrolledWindow(vexpand=True)
         self.scroller.set_child(self.list)
         self.footer = Gtk.Box(spacing=16)
@@ -263,11 +265,20 @@ class Settings(Gtk.ApplicationWindow):
             w = self.render_item(it, focused=(i == self.index), index=i)
             if i == self.index:
                 focus_widget = w
+                if it.kind == "setting" and it.row.kind == "secret" and sm.key_help(it.row.key):
+                    help_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+                    help_box.add_css_class("keyhelp")
+                    for line in sm.key_help(it.row.key):
+                        lab = Gtk.Label(label=line, xalign=0, wrap=True)
+                        lab.add_css_class("hint")
+                        help_box.append(lab)
             if it.selectable:
                 click = Gtk.GestureClick()
                 click.connect("released", lambda *_a, i=i: self.click(i))
                 w.add_controller(click)
             self.list.append(w)
+            if i == self.index and it.kind == "setting" and it.row.kind == "secret" and sm.key_help(it.row.key):
+                self.list.append(help_box)  # how to get this key, right under it
 
         self.footer_keys.set_text("  ·  ".join(sm.FOOTERS[sm.TABS[self.tab]]))
         current = self.items[self.index] if 0 <= self.index < len(self.items) else None
