@@ -76,8 +76,8 @@ How Rum turns your voice into text:
 
 1. On elevenlabs.io, go to **Profile → API keys → Create API key**, and turn on **Text to Speech** (and **Voices: Read** to also see your own voices).
 2. Copy the key from the box that appears. **A real key starts with `sk_`.** The 64-character code in the key list is only its ID and won't work.
-3. In settings → **Engine** → **ElevenLabs API key**: press Enter, paste, press Enter.
-4. Pick a voice in **ElevenLabs voice**. Settings shows "✓ works", or tells you in plain words what's wrong.
+3. In settings, pick an ElevenLabs voice in **Voice**; the **ElevenLabs key** row appears under it: press Enter, paste, press Enter.
+4. The bottom line shows "✓ works", or tells you in plain words what's wrong.
 
 ### ZONOS3-Mini (optional local voice)
 
@@ -86,7 +86,7 @@ Build it from [Zyphra/ZONOS3-Mini](https://github.com/Zyphra/ZONOS3-Mini) into `
 ## Your data and privacy
 
 - **Everything stays on your computer:** conversations, memory and settings live in `~/.local/share/omarum` and `~/.config/omarum`. API keys are in `~/.config/omarum/env`, readable only by you.
-- **What leaves it:** what you say goes to the brain you chose, and Rum's replies go to the voice service you chose (if it's a cloud one). With "See the code you're looking at" on, the open file goes to the brain too, and when you ask Rum to look at your screen, that one screenshot does. You can turn either off in settings → Companion → Awareness.
+- **What leaves it:** what you say goes to the brain you chose, and Rum's replies go to the voice service you chose (if it's a cloud one). With "See my code" on, the open file goes to the brain too, and when you ask Rum to look at your screen, that one screenshot does. You can turn either off in settings → Screen.
 - **Speech recognition** (Whisper) always runs locally.
 
 ## Remove
@@ -101,9 +101,9 @@ This stops Rum, the orb and the shortcut. Your conversations, memory and setting
 
 - **Rum doesn't answer, or the panel shows a red message:** the message says why, for example "Codex is not logged in. Run: codex login" or "Gemini needs an API key".
 - **Rum can't see your code:** the editor must be the focused window when you speak, and the project should be one IntelliJ knows (or live in `~/Projects`, `~/IdeaProjects` or `~/Work`).
-- **Rum interrupts you:** hold Ctrl+Shift+Space while you talk (she waits until you let go), or set **Response speed** to *patient* in settings → Companion.
+- **Rum interrupts you:** hold Ctrl+Shift+Space while you talk (she waits until you let go), or set **Response speed** to *patient* in settings.
 - **Rum mishears you** (names, technical words): settings → **Processing → Accurate**. The log line `whisper: large-v3-turbo on cuda` means it's working; `Accurate needs GPU support` means the download isn't done yet, and an out-of-memory message means other apps are using the GPU.
-- **Rum takes long to answer:** set **Response speed** to *fast* in settings → Companion, or the brain's **Model** to `haiku` in settings → Engine.
+- **Rum takes long to answer:** set **Response speed** to *fast*, or the brain's **Model** to `haiku`, in settings.
 - **Logs:** `~/.local/state/omarum/daemon.log`
 
 ## Development
