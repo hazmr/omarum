@@ -259,3 +259,9 @@ def shown_value(r: Row, values: dict):
         wait = float(values.get("vad_stop_secs", 0.5))
         return min(SPEED_PRESETS, key=lambda n: abs(SPEED_PRESETS[n]["vad_stop_secs"] - wait))
     return value
+
+
+def download_command(python: str, code_root: str, model_id: str, environ: dict) -> tuple[list[str], dict]:
+    """`omarum models download <id>` with the engine's Python but the window's own code."""
+    env = {**environ, "PYTHONPATH": str(code_root)}
+    return [python, "-m", "omarum.cli", "models", "download", model_id], env

@@ -206,3 +206,11 @@ def test_old_values_show_as_the_nearest_button():
     assert sm.shown_value(rows["Response speed"], old) == "balanced"
     assert sm.shown_value(rows["Response speed"], {"response_speed": "custom", "vad_stop_secs": 1.5}) == "patient"
     assert sm.shown_value(rows["Style"], {"orb_style": "ring"}) == "ring"
+
+
+def test_download_runs_the_code_next_to_the_window():
+    """The engine venv may hold an older omarum (before the plugin updates); the download child
+    must run the same code as the window, so PYTHONPATH points at the window's own checkout."""
+    argv, env = sm.download_command("/venv/bin/python", "/plugins/omarum.panel", "gpu", {"PATH": "/usr/bin"})
+    assert argv == ["/venv/bin/python", "-m", "omarum.cli", "models", "download", "gpu"]
+    assert env["PYTHONPATH"] == "/plugins/omarum.panel" and env["PATH"] == "/usr/bin"

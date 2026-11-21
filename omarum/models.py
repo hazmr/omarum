@@ -61,7 +61,7 @@ def pick_whisper(cfg, cuda_devices: int | None = None, cuda_libs: bool | None = 
     gpu = cuda_devices > 0 and cuda_libs
     use_cuda = (cfg.whisper_device == "cuda" and gpu) or (cfg.whisper_device == "auto" and gpu)
     if use_cuda:
-        return (cfg.whisper_model, "cuda", "default")
+        return (cfg.whisper_model, "cuda", "int8_float16")  # half the memory of float16: fits beside other GPU apps
     if cfg.whisper_device in ("cuda", "auto") and cuda_devices > 0 and not cuda_libs:
         from loguru import logger
 

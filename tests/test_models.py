@@ -18,7 +18,7 @@ def test_pick_whisper_uses_gpu_model_when_cuda_available():
     from omarum.config import Config
     from omarum.models import pick_whisper
 
-    assert pick_whisper(Config(), cuda_devices=1, cuda_libs=True) == ("large-v3-turbo", "cuda", "default")
+    assert pick_whisper(Config(), cuda_devices=1, cuda_libs=True) == ("large-v3-turbo", "cuda", "int8_float16")
 
 
 def test_pick_whisper_falls_back_to_cpu_model():
@@ -48,7 +48,7 @@ def test_make_stt_falls_back_to_cpu_on_cuda_oom():
         return "stt"
 
     assert make_stt(Config(), factory, cuda_devices=1, cuda_libs=True) == "stt"
-    assert calls == [("large-v3-turbo", "cuda", "default"), ("base.en", "cpu", "int8")]
+    assert calls == [("large-v3-turbo", "cuda", "int8_float16"), ("base.en", "cpu", "int8")]
 
 
 def test_make_stt_reraises_other_errors():
@@ -87,7 +87,7 @@ def test_pick_whisper_needs_cuda_libraries_not_just_a_gpu():
 
     # A GPU the driver sees, but no libcublas: transcription would fail on every turn.
     assert pick_whisper(Config(), cuda_devices=1, cuda_libs=False) == ("base.en", "cpu", "int8")
-    assert pick_whisper(Config(), cuda_devices=1, cuda_libs=True) == ("large-v3-turbo", "cuda", "default")
+    assert pick_whisper(Config(), cuda_devices=1, cuda_libs=True) == ("large-v3-turbo", "cuda", "int8_float16")
 
 
 def test_cuda_libs_loadable_probe():

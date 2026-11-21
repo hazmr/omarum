@@ -484,8 +484,11 @@ class Settings(Gtk.ApplicationWindow):
         """Run `omarum models download <id>` in the background; redraw on each progress line."""
         if model_id in self.downloads:
             return
-        proc = Gio.Subprocess.new([venv_python(), "-m", "omarum.cli", "models", "download", model_id],
-                                  Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE)
+        argv, env = sm.download_command(venv_python(), str(Path(__file__).resolve().parent.parent),
+                                        model_id, dict(os.environ))
+        launcher = Gio.SubprocessLauncher.new(Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE)
+        launcher.set_environ([f"{k}={v}" for k, v in env.items()])
+        proc = launcher.spawnv(argv)
         self.downloads[model_id] = proc
         self.live[model_id] = {"done": 0, "total": catalog.by_id(model_id).approx_bytes}
         stream = Gio.DataInputStream.new(proc.get_stdout_pipe())
