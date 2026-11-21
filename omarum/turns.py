@@ -11,19 +11,49 @@ from omarum.config import Config
 
 
 class HoldMixin:
-    """While the talk key is held, "your turn is over" waits; letting go sends it."""
+    """While the talk key is held, "your turn is over" waits; letting go sends it.
+
+    If the voice detector never noticed the held speech, there is no turn waiting when the key
+    comes up: then the transcript of the held audio (KeptWhisper records exactly that) ends the
+    turn when it arrives, so letting go always hands the turn to Rum.
+    """
 
     _held = False
     _pending = False
+    _stop_on_transcript = False
+    RELEASE_WAIT = 4.0  # seconds to wait for that transcript (nothing said: no turn)
 
     def hold(self) -> None:
         self._held = True
+        self._stop_on_transcript = False
 
     async def release(self) -> None:
+        import asyncio
+
         self._held = False
         if self._pending:
             self._pending = False
             await super().report_user_turn_stopped()
+            return
+        self._stop_on_transcript = True
+        asyncio.get_running_loop().call_later(self.RELEASE_WAIT, self._expire)
+
+    def _expire(self) -> None:
+        self._stop_on_transcript = False
+
+    async def process_frame(self, frame):
+        import asyncio
+
+        from pipecat.frames.frames import TranscriptionFrame
+
+        result = await super().process_frame(frame)
+        if self._stop_on_transcript and isinstance(frame, TranscriptionFrame) \
+                and getattr(frame, "finalized", True):
+            self._stop_on_transcript = False
+            report = super().report_user_turn_stopped
+            # A moment later, so the transcript has started the turn before it ends.
+            asyncio.get_running_loop().call_later(0.05, lambda: asyncio.ensure_future(report()))
+        return result
 
     async def report_user_turn_stopped(self, **kwargs):
         if self._held:

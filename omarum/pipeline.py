@@ -47,6 +47,29 @@ class KeptWhisper(WhisperSTTService):
         self._fallback_model = fallback_model
         super().__init__(*args, **kwargs)
 
+    keyed = False  # the talk key is down: record from press to release, whatever the voice detector says
+
+    async def key_down(self) -> None:
+        if self.keyed:
+            return
+        self.keyed = True
+        await self._handle_user_started_speaking(None)
+
+    async def key_up(self) -> None:
+        if not self.keyed:
+            return
+        self.keyed = False
+        await self._handle_user_stopped_speaking(None)  # transcribe everything that was held
+
+    async def process_frame(self, frame, direction):
+        from pipecat.frames.frames import VADUserStartedSpeakingFrame, VADUserStoppedSpeakingFrame
+        from pipecat.services.stt_service import STTService
+
+        if self.keyed and isinstance(frame, (VADUserStartedSpeakingFrame, VADUserStoppedSpeakingFrame)):
+            await STTService.process_frame(self, frame, direction)  # the key decides the segment
+            return
+        await super().process_frame(frame, direction)
+
     def _load(self):
         self._model = cached_whisper_model(self._settings.model, self._device, self._compute_type)
         unsupported = self._unsupported_language()
@@ -129,6 +152,7 @@ def build_pipeline(cfg: Config, emit: Emit, store=None) -> tuple[PipelineTask, C
 
     turn_hold = holdable_turn_stop()  # the talk key holds your turn open (daemon: hold_start/hold_end)
     session.turn_hold = turn_hold
+    session.stt = stt  # the daemon tells it when the talk key goes down and up
     aggregators = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(

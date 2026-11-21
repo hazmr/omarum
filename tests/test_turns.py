@@ -64,3 +64,63 @@ async def test_rum_waits_while_you_hold_and_answers_on_release():
     assert fired == [1]
     await s.report_user_turn_stopped()  # not held: works as before
     assert fired == [1, 1]
+
+
+async def test_letting_go_ends_the_turn_when_the_transcript_arrives():
+    """Seen 2026-11-21 14:47: the voice detector missed a held sentence, so after letting go
+    Rum never took her turn. With the key, the transcript of the held audio ends the turn."""
+    import asyncio
+
+    from pipecat.frames.frames import TranscriptionFrame
+
+    from omarum.turns import HoldMixin
+
+    class Base:
+        def __init__(self):
+            self.stopped = 0
+
+        async def report_user_turn_stopped(self, **kwargs):
+            self.stopped += 1
+
+        async def process_frame(self, frame):
+            return None
+
+    class S(HoldMixin, Base):
+        pass
+
+    s = S()
+    s.hold()
+    await s.release()  # the detector never saw speech: nothing pending
+    assert s.stopped == 0
+    t = TranscriptionFrame("what does this do", "user", "now")
+    t.finalized = True
+    await s.process_frame(t)
+    await asyncio.sleep(0.15)
+    assert s.stopped == 1
+    await s.process_frame(t)  # later transcripts (hands-free talk) don't end turns by themselves
+    await asyncio.sleep(0.15)
+    assert s.stopped == 1
+
+
+async def test_a_release_with_nothing_said_expires():
+    import asyncio
+
+    from omarum.turns import HoldMixin
+
+    class Base:
+        stopped = 0
+
+        async def report_user_turn_stopped(self, **kwargs):
+            self.stopped += 1
+
+        async def process_frame(self, frame):
+            return None
+
+    class S(HoldMixin, Base):
+        RELEASE_WAIT = 0.1
+
+    s = S()
+    s.hold()
+    await s.release()
+    await asyncio.sleep(0.2)
+    assert s._stop_on_transcript is False

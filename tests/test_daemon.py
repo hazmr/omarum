@@ -607,3 +607,44 @@ async def test_hands_free_talk_mode_double_tap_keeps_the_mic_open():
     await tap()
     await asyncio.sleep(0.8)
     assert f.starts == 1 and d._ptt.mode == "hands_free" and d._mic_open is True
+
+
+class FakeKeyedStt:
+    def __init__(self):
+        self.events = []
+
+    async def key_down(self):
+        self.events.append("down")
+
+    async def key_up(self):
+        self.events.append("up")
+
+
+async def test_hold_tells_whisper_when_the_key_goes_down_and_up(monkeypatch):
+    clock = [0.0]
+    monkeypatch.setattr("omarum.daemon.time.monotonic", lambda: clock[0])
+    f = GateFactory()
+    d = make(f)
+    await d.handle({"cmd": "toggle"})
+    f.session.stt = FakeKeyedStt()
+    await d._ptt_act(["hold_start", "mic_open"])
+    await d._ptt_act(["hold_end", "mic_close"])
+    assert f.session.stt.events == ["down", "up"]
+
+
+async def test_a_hold_that_began_while_starting_reaches_whisper(monkeypatch):
+    stt = FakeKeyedStt()
+
+    class F(GateFactory):
+        def __call__(self, cfg, emit):
+            task, stop, session = super().__call__(cfg, emit)
+            session.stt = stt
+            return task, stop, session
+
+    f = F(build_delay=0.3)
+    d = make(f)
+    start = asyncio.create_task(d.handle({"cmd": "toggle"}))
+    await asyncio.sleep(0.1)
+    await d._ptt_act(["hold_start", "mic_open"])  # pressed while Rum is still starting
+    await start
+    assert stt.events == ["down"]

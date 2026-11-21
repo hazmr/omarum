@@ -238,8 +238,14 @@ class Daemon:
                 hold = getattr(self._recording, "turn_hold", None)
                 if hold is not None:
                     hold.hold()
+                stt = getattr(self._recording, "stt", None)
+                if stt is not None:
+                    await stt.key_down()  # record what you say until you let go
             elif action == "hold_end":
                 self._holding = False
+                stt = getattr(self._recording, "stt", None)
+                if stt is not None:
+                    await stt.key_up()
                 hold = getattr(self._recording, "turn_hold", None)
                 if hold is not None:
                     await hold.release()
@@ -291,6 +297,9 @@ class Daemon:
         hold = getattr(self._recording, "turn_hold", None)
         if self._holding and hold is not None:
             hold.hold()  # the key went down (a hold) while Rum was still starting
+        stt = getattr(self._recording, "stt", None)
+        if self._holding and stt is not None:
+            await stt.key_down()
         self._runner = asyncio.create_task(self._run(task, self._session))
         if self._stop_when_started:
             self._stop_when_started = False

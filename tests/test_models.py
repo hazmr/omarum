@@ -194,3 +194,29 @@ async def test_gpu_out_of_memory_falls_back_to_the_cpu_model(monkeypatch):
     frames = [f async for f in stt.run_stt(np.zeros(16000, np.int16).tobytes())]
     assert any(isinstance(f, TranscriptionFrame) and "hello there" in f.text for f in frames)
     assert loads[-1] == ("base.en", "cpu") and stt._device == "cpu"
+
+
+async def test_whisper_records_exactly_the_held_audio(monkeypatch):
+    from omarum import pipeline
+
+    class M:
+        supported_languages = None
+
+    monkeypatch.setattr(pipeline, "cached_whisper_model", lambda *a: M())
+    stt = pipeline.KeptWhisper(settings=pipeline.WhisperSTTService.Settings(model="x"), device="cpu",
+                               compute_type="int8")
+    calls = []
+
+    async def started(frame):
+        calls.append("start")
+
+    async def stopped(frame):
+        calls.append("stop")
+
+    stt._handle_user_started_speaking, stt._handle_user_stopped_speaking = started, stopped
+    await stt.key_down()
+    assert calls == ["start"] and stt.keyed
+    await stt.key_up()
+    assert calls == ["start", "stop"] and not stt.keyed
+    await stt.key_up()  # a stray release does nothing
+    assert calls == ["start", "stop"]
