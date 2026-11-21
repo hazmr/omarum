@@ -180,3 +180,29 @@ def test_response_speed_presets():
     assert sm.SPEED_PRESETS["balanced"] == {"vad_stop_secs": 0.5, "whisper_cpu_model": "base.en"}
     assert Config().response_speed == "balanced" and Config().vad_stop_secs == 0.5
     assert sm.speed_of({"vad_stop_secs": 0.7, "whisper_cpu_model": "base.en"}) == "custom"
+
+
+def test_human_size():
+    assert sm.human_size(1_620_000_000) == "1.6 GB" and sm.human_size(464_000_000) == "464 MB"
+    assert sm.human_size(63_000_000) == "63 MB" and sm.human_size(0) == "—"
+
+
+def test_model_status_text_matches_the_spec():
+    base = {"done": 680_000_000, "total": 1_620_000_000, "error": "", "in_use": False}
+    assert sm.model_status({**base, "state": "missing"}) == "↓ Download"
+    assert sm.model_status({**base, "state": "downloading"}) == "↓ 42%  680 MB of 1.6 GB"
+    assert sm.model_status({**base, "state": "partial"}) == "Paused  680 MB of 1.6 GB"
+    assert sm.model_status({**base, "state": "ready"}) == "✓ Ready"
+    assert sm.model_status({**base, "state": "ready", "in_use": True}) == "✓ Ready  (in use)"
+    assert sm.model_status({**base, "state": "failed", "error": "timed out"}) == "✗ Failed: timed out  Enter to retry"
+
+
+def test_old_values_show_as_the_nearest_button():
+    """config.toml from before the redesign: whisper_device="cuda", response_speed="custom" (0.6 s)."""
+    rows = {r.label: r for r in rows_for("Settings", CODEX)}
+    assert sm.shown_value(rows["Processing"], {"whisper_device": "cuda"}) == "auto"
+    assert sm.shown_value(rows["Processing"], {"whisper_device": "cpu"}) == "cpu"
+    old = {"response_speed": "custom", "vad_stop_secs": 0.6}
+    assert sm.shown_value(rows["Response speed"], old) == "balanced"
+    assert sm.shown_value(rows["Response speed"], {"response_speed": "custom", "vad_stop_secs": 1.5}) == "patient"
+    assert sm.shown_value(rows["Style"], {"orb_style": "ring"}) == "ring"

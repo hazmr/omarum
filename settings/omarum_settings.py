@@ -18,14 +18,15 @@ import gi  # noqa: E402
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Gdk", "4.0")
-from gi.repository import Gdk, GLib, Gtk, Pango  # noqa: E402
+from gi.repository import Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
 
-from omarum import brains, library, settings_model as sm  # noqa: E402
+from omarum import brains, catalog, library, modelcmd, settings_model as sm  # noqa: E402
 from omarum.config import load_config  # noqa: E402
 from omarum import elevenlabs  # noqa: E402
 from omarum.configio import get_secret, has_secret, save_config, set_secret  # noqa: E402
 from omarum.ipc import DaemonNotRunning, send_command  # noqa: E402
 from omarum.models import MODELS_DIR  # noqa: E402
+from omarum.paths import DATA_DIR  # noqa: E402
 from omarum.shortcuts import conflicts, current_binds, normalize  # noqa: E402
 from omarum.store import Store  # noqa: E402
 from omarum.theme import ui_colors  # noqa: E402
@@ -33,27 +34,43 @@ from omarum.zonos3_tts import is_installed as zonos3_installed  # noqa: E402
 
 
 def css(c: dict) -> str:
+    # Sizes measured from Superwhisper's settings window: 12px text, 28px rows, the value column
+    # ~180px in, small bold section titles, compact capitalized buttons, hints only in the footer.
     return f"""
     window, .root {{ background: {c['background']}; color: {c['foreground']};
-        font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", monospace; font-size: 14px; }}
-    .header {{ border-bottom: 1px solid alpha({c['muted']}, 0.6); min-height: 50px; }}
-    .brand {{ color: {c['accent']}; padding: 0 22px 0 18px; }}
-    .tab {{ color: {c['light_foreground']}; padding: 0 18px; border-bottom: 2px solid transparent; opacity: 0.6; }}
+        font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", monospace; font-size: 12px; }}
+    .header {{ border-bottom: 1px solid alpha({c['muted']}, 0.6); min-height: 44px; }}
+    .brand {{ color: {c['accent']}; padding: 0 20px 0 16px; }}
+    .tab {{ color: {c['light_foreground']}; padding: 0 14px; border-bottom: 2px solid transparent; opacity: 0.6; }}
     .tab.on {{ color: {c['foreground']}; border-bottom-color: {c['accent']}; opacity: 1; }}
-    .group {{ color: alpha({c['light_foreground']}, 0.6); font-size: 13px; padding: 14px 0 6px 0; }}
-    .row {{ padding: 7px 15px; border-left: 2px solid transparent; }}
-    .row.focus {{ background: alpha({c['selection']}, 0.45); border-left-color: {c['accent']}; }}
+    .group {{ color: {c['foreground']}; font-weight: bold; font-size: 11px; padding: 16px 0 6px 0; }}
+    .row {{ min-height: 28px; padding: 0 15px; }}
+    .row.focus {{ background: alpha({c['selection']}, 0.45); }}
     .row.focus .label {{ color: {c['accent']}; }}
     .value {{ color: {c['light_foreground']}; }}
-    .row.focus .value {{ color: {c['accent']}; }}
+    .row.focus .value {{ color: {c['foreground']}; }}
     .arrow {{ color: alpha({c['light_foreground']}, 0.5); }}
-    .seg {{ border: 1px solid {c['muted']}; padding: 2px 11px; color: alpha({c['light_foreground']}, 0.7); font-size: 13px; }}
+    .seg {{ border: 1px solid {c['muted']}; padding: 1px 9px; color: alpha({c['light_foreground']}, 0.75); font-size: 11px; }}
     .seg.on {{ background: alpha({c['muted']}, 0.8); color: {c['foreground']}; border-color: {c['light_foreground']}; font-weight: bold; }}
-    .hint {{ color: alpha({c['light_foreground']}, 0.45); font-size: 12px; }}
+    .hint {{ color: alpha({c['light_foreground']}, 0.5); font-size: 11px; }}
+    .size {{ color: alpha({c['light_foreground']}, 0.6); }}
     .ok {{ color: #87a9b0; }} .bad {{ color: #c38b7b; }}
-    .footer {{ border-top: 1px solid alpha({c['muted']}, 0.6); padding: 9px 16px; color: {c['light_foreground']}; font-size: 13px; }}
-    entry {{ background: {c['background']}; color: {c['foreground']}; border: 1px solid {c['accent']}; border-radius: 0; min-height: 0; padding: 2px 6px; }}
+    .footer {{ border-top: 1px solid alpha({c['muted']}, 0.6); padding: 8px 16px; color: {c['light_foreground']}; font-size: 11px; }}
+    entry {{ background: {c['background']}; color: {c['foreground']}; border: 1px solid {c['accent']}; border-radius: 0; min-height: 0; padding: 1px 6px; }}
     """
+
+
+def rgb(hex_color: str) -> tuple[float, float, float]:
+    h = hex_color.lstrip("#")
+    return tuple(int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
+
+
+def venv_python() -> str:
+    """Rum's engine Python (has the download code's dependencies and is what setup uses)."""
+    for p in (DATA_DIR / "venv" / "bin" / "python", Path(__file__).resolve().parent.parent / ".venv" / "bin" / "python"):
+        if p.exists():
+            return str(p)
+    return sys.executable
 
 
 class Item:
@@ -86,9 +103,14 @@ class Settings(Gtk.ApplicationWindow):
         self.player: subprocess.Popen | None = None
         self.message = ""
         self.capturing: sm.Row | None = None  # recording a new shortcut for this row
+        self.colors = ui_colors()
+        self.downloads: dict[str, Gio.Subprocess] = {}  # model id → running `omarum models download`
+        self.live: dict[str, dict] = {}  # model id → its latest progress line
+        self.pending_voice: str | None = None  # a voice whose model isn't downloaded yet
+        self.zonos3 = zonos3_installed()
 
         provider = Gtk.CssProvider()
-        provider.load_from_string(css(ui_colors()))
+        provider.load_from_string(css(self.colors))
         Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), provider,
                                                   Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
@@ -102,8 +124,14 @@ class Settings(Gtk.ApplicationWindow):
         self.list.set_margin_top(6)
         self.scroller = Gtk.ScrolledWindow(vexpand=True)
         self.scroller.set_child(self.list)
-        self.footer = Gtk.Label(xalign=1)
+        self.footer = Gtk.Box(spacing=16)
         self.footer.add_css_class("footer")
+        self.footer_hint = Gtk.Label(xalign=0, hexpand=True)
+        self.footer_hint.add_css_class("hint")
+        self.footer_hint.set_ellipsize(Pango.EllipsizeMode.END)
+        self.footer_keys = Gtk.Label(xalign=1)
+        self.footer.append(self.footer_hint)
+        self.footer.append(self.footer_keys)
         root.append(self.header)
         root.append(self.scroller)
         root.append(self.footer)
@@ -118,26 +146,29 @@ class Settings(Gtk.ApplicationWindow):
         self.connect("close-request", lambda *_: self.stop_playback() or False)
         self.render()
         self.check_elevenlabs()  # fresh voice list and a plain-words status each time settings opens
+        GLib.timeout_add(1000, self.tick)  # downloads started elsewhere show up within a second
 
     # -- data -----------------------------------------------------------------
     def build_items(self) -> list[Item]:
         tab = sm.TABS[self.tab]
         items: list[Item] = []
         group = None
-        for r in sm.rows_for(tab, brain=self.values.get("brain", "claude-code"), brain_status=self.brain_status,
-                             eleven_voices=self.eleven_voices, eleven_status=self.eleven_status):
+        for r in sm.rows_for(tab, self.values, brain_status=self.brain_status,
+                             eleven_voices=self.eleven_voices, zonos3=self.zonos3):
             if r.group != group:
                 group = r.group
                 items.append(Item("group", group))
             hint = r.hint
-            if r.key == "voice_primary" and self.values.get("voice_primary") == "elevenlabs" \
-                    and not has_secret("ELEVENLABS_API_KEY"):
-                hint = "⚠ no ElevenLabs API key yet: add it on the next line (until then Rum uses ZONOS3)"
+            if r.key == "ELEVENLABS_API_KEY":
+                hint = self.eleven_status or ("no key yet: until then Rum uses the next voice · " + r.hint
+                                              if not has_secret(r.key) else r.hint)
             items.append(Item("setting", r.label, r, hint=hint))
-        if tab == "Engine":
-            items.append(Item("group", "Status"))
-            for label, ok, detail in self.status():
-                items.append(Item("info", label, data=ok, hint=detail))
+        if tab == "Models":
+            for g in ("Speech to text", "Voices"):
+                items.append(Item("group", g))
+                items += [Item("model", s["title"], data=s) for s in self.model_states() if s["group"] == g]
+            items.append(Item("zonos3", "ZONOS3", data=self.zonos3,
+                              hint="Installed" if self.zonos3 else "Not installed: build it, see README"))
         elif tab == "Memory":
             name = self.values["companion_name"]
             items.append(Item("group", f"What {name} knows about you"))
@@ -166,17 +197,21 @@ class Settings(Gtk.ApplicationWindow):
     def brain_status(self, p) -> str:
         return brains.status(p, self.brain_env(), shutil.which, self.values.get("brain_url", ""))
 
-    def status(self) -> list[tuple[str, bool, str]]:
-        whisper = sorted(p.name for p in (MODELS_DIR / "whisper").glob("*") if (p / "model.bin").exists()) \
-            if (MODELS_DIR / "whisper").is_dir() else []
-        return [
-            ("Brain", brains.not_ready_reason(self.dataclass_cfg(), self.brain_env()) is None,
-             brains.not_ready_reason(self.dataclass_cfg(), self.brain_env()) or brains.label(self.dataclass_cfg())),
-            ("ZONOS3 voice", zonos3_installed(), "local voice server"),
-            ("Kokoro voice", (MODELS_DIR / "kokoro" / "kokoro-v1.0.onnx").exists(), "always-there fallback"),
-            ("Whisper models", bool(whisper), ", ".join(whisper) or "downloaded on first use"),
-            ("ElevenLabs", self.eleven_ok, self.eleven_status or ("checking…" if has_secret("ELEVENLABS_API_KEY") else "optional cloud voice: add a key above")),
-        ]
+    def model_states(self) -> list[dict]:
+        """Every model with its state (live progress from our own downloads wins)."""
+        used = modelcmd.in_use(self.dataclass_cfg())
+        out = []
+        for m in catalog.CATALOG:
+            st = {**catalog.state(m, MODELS_DIR), "size": m.approx_bytes, "in_use": m.id in used,
+                  "removable": m.removable}
+            live = self.live.get(m.id)
+            if live and m.id in self.downloads:
+                st.update(state="downloading", done=live.get("done", 0), total=live.get("total") or st["total"])
+            out.append(st)
+        return out
+
+    def model_state(self, model_id: str) -> dict:
+        return next(s for s in self.model_states() if s["id"] == model_id)
 
     def dataclass_cfg(self):
         from omarum.config import Config
@@ -184,7 +219,16 @@ class Settings(Gtk.ApplicationWindow):
         return Config(**self.values)
 
     def value_of(self, r: sm.Row):
-        return has_secret(r.key) if r.kind == "secret" else self.values.get(r.key)
+        if r.kind == "voice":
+            return self.pending_voice or sm.voice_value(self.values)
+        if r.kind == "secret":
+            return has_secret(r.key)
+        return sm.shown_value(r, self.values)
+
+    @staticmethod
+    def voice_model(choice: str) -> str | None:
+        """The model a voice needs downloaded (Kokoro, Piper), or None (cloud / built separately)."""
+        return modelcmd.VOICE_MODELS.get(choice.partition(":")[0])
 
     # -- rendering ------------------------------------------------------------
     def render(self) -> None:
@@ -225,9 +269,12 @@ class Settings(Gtk.ApplicationWindow):
                 w.add_controller(click)
             self.list.append(w)
 
-        hints = sm.FOOTERS[sm.TABS[self.tab]]
-        text = "   ·   ".join(hints)
-        self.footer.set_text(self.message or text)
+        self.footer_keys.set_text("  ·  ".join(sm.FOOTERS[sm.TABS[self.tab]]))
+        current = self.items[self.index] if 0 <= self.index < len(self.items) else None
+        hint = current.hint if current is not None and current.kind in ("setting", "zonos3") else ""
+        if current is not None and current.kind == "model" and current.data.get("in_use") and not self.message:
+            hint = "in use: Rum needs it with your current settings"
+        self.footer_hint.set_text(self.message or hint)
         if focus_widget is not None:
             GLib.idle_add(self.scroll_to, focus_widget)
 
@@ -259,14 +306,27 @@ class Settings(Gtk.ApplicationWindow):
             label.set_hexpand(True)
             label.set_max_width_chars(80)
         else:
-            label.set_size_request(260, -1)
+            label.set_size_request(165, -1)
         row.append(label)
         if it.kind == "setting":
             row.append(self.render_value(it.row, focused, index))
-        elif it.kind == "info" and it.data is not None:
-            mark = Gtk.Label(label="● ok" if it.data else "○ missing")
-            mark.add_css_class("ok" if it.data else "bad")
-            row.append(mark)
+            return row  # its hint shows in the footer while selected
+        if it.kind == "model":
+            size = Gtk.Label(label=sm.human_size(it.data["size"]), xalign=1)
+            size.add_css_class("size")
+            size.set_size_request(70, -1)
+            state = Gtk.Label(label=sm.model_status(it.data), xalign=0)
+            state.add_css_class("value")
+            if it.data["state"] == "failed":
+                state.add_css_class("bad")
+            row.append(size)
+            row.append(state)
+            return row
+        if it.kind == "zonos3":
+            v = Gtk.Label(label=it.hint, xalign=0)
+            v.add_css_class("value")
+            row.append(v)
+            return row
         if it.hint:
             hint = Gtk.Label(label=it.hint, xalign=0)
             hint.add_css_class("hint")
@@ -318,23 +378,40 @@ class Settings(Gtk.ApplicationWindow):
         if r.kind == "seg":
             box = Gtk.Box(spacing=6)
             for opt in r.options:
-                s = Gtk.Label(label=str(opt))
+                s = Gtk.Label(label=sm.display(r, opt))
                 s.add_css_class("seg")
                 if opt == value:
                     s.add_css_class("on")
                 box.append(self.clickable(s, lambda o=opt: self.pick(index, r, o)))
+            if r.key == "whisper_device":
+                note = self.processing_note()
+                if note:
+                    n = Gtk.Label(label=note)
+                    n.add_css_class("hint")
+                    box.append(n)
             return box
         if r.kind == "slider":
             lo, hi, _inc, _unit = r.options
-            filled = round((value - lo) / (hi - lo) * 20) if hi > lo else 0
-            bar = "━" * filled + "●" + "─" * (20 - filled)
-            v = Gtk.Label(label=f"{bar}  {sm.display(r, value)}")
+            frac = (value - lo) / (hi - lo) if hi > lo else 0
+            box = Gtk.Box(spacing=10)
+            box.append(self.drawing(180, 14, lambda cr, w, h: self.draw_slider(cr, w, h, frac)))
+            v = Gtk.Label(label=sm.display(r, value))
             v.add_css_class("value")
-            return self.arrows(index, v)
+            box.append(v)
+            return box
         if r.kind == "toggle":
-            v = Gtk.Label(label=("[■■  on ]" if value else "[ off ■■]"))
+            return self.clickable(self.drawing(26, 14, lambda cr, w, h: self.draw_switch(cr, w, h, bool(value))),
+                                  lambda: self.pick(index, r, not value))
+        if r.kind == "voice":
+            v = Gtk.Label(label=sm.display(r, value).center(24))
             v.add_css_class("value")
-            return v
+            box = self.arrows(index, v)
+            note = self.voice_note(value)
+            if note:
+                n = Gtk.Label(label=note)
+                n.add_css_class("hint")
+                box.append(n)
+            return box
         if r.kind in ("cycle", "model"):
             v = Gtk.Label(label=sm.display(r, value).center(18))
             v.add_css_class("value")
@@ -346,6 +423,134 @@ class Settings(Gtk.ApplicationWindow):
         v = Gtk.Label(label=sm.display(r, value) if r.kind in ("secret", "text", "shortcut") else "")
         v.add_css_class("value")
         return v
+
+    def drawing(self, w: int, h: int, draw) -> Gtk.DrawingArea:
+        area = Gtk.DrawingArea(content_width=w, content_height=h, valign=Gtk.Align.CENTER)
+        area.set_draw_func(lambda _a, cr, width, height: draw(cr, width, height))
+        return area
+
+    def draw_switch(self, cr, w: int, h: int, on: bool) -> None:
+        """A small switch like Superwhisper's: an outlined box with a square knob."""
+        line = rgb(self.colors["light_foreground"])
+        cr.set_source_rgba(*line, 0.7)
+        cr.set_line_width(1)
+        cr.rectangle(0.5, 0.5, w - 1, h - 1)
+        cr.stroke()
+        knob = h - 6
+        cr.set_source_rgb(*(rgb(self.colors["foreground"]) if on else line))
+        cr.rectangle(w - 3 - knob if on else 3, 3, knob, knob)
+        cr.fill()
+
+    def draw_slider(self, cr, w: int, h: int, frac: float) -> None:
+        """A thin track with a tick at the value."""
+        cr.set_source_rgba(*rgb(self.colors["light_foreground"]), 0.45)
+        cr.rectangle(0, h / 2 - 0.5, w, 1)
+        cr.fill()
+        x = max(1, min(w - 2, frac * w))
+        cr.set_source_rgb(*rgb(self.colors["foreground"]))
+        cr.rectangle(x - 1, h / 2 - 5, 2, 10)
+        cr.fill()
+
+    def progress(self, model_id: str) -> str:
+        st = self.model_state(model_id)
+        if st["state"] == "downloading":
+            return f"↓ {round(st['done'] * 100 / st['total']) if st['total'] else 0}%"
+        return ""
+
+    def voice_note(self, choice: str) -> str:
+        model_id = self.voice_model(choice)
+        if not model_id:
+            return ""
+        st = self.model_state(model_id)
+        if st["state"] == "ready":
+            return ""
+        return self.progress(model_id) or f"({sm.human_size(st['size'])} · Enter to download)"
+
+    def processing_note(self) -> str:
+        if self.values.get("whisper_device") not in ("auto", "cuda"):
+            return ""
+        if not shutil.which("nvidia-smi"):
+            return "no NVIDIA GPU: Rum uses Fast"
+        missing = [i for i in ("gpu", "whisper-large-turbo") if self.model_state(i)["state"] != "ready"]
+        if not missing:
+            return ""
+        running = [self.progress(i) for i in missing if self.progress(i)]
+        if running:
+            return "downloading " + running[0].lstrip("↓ ") + " · Rum uses Fast until it's ready"
+        size = sum(self.model_state(i)["size"] for i in missing)
+        return f"needs {sm.human_size(size)} · Enter to download"
+
+    def start_download(self, model_id: str, then=None) -> None:
+        """Run `omarum models download <id>` in the background; redraw on each progress line."""
+        if model_id in self.downloads:
+            return
+        proc = Gio.Subprocess.new([venv_python(), "-m", "omarum.cli", "models", "download", model_id],
+                                  Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE)
+        self.downloads[model_id] = proc
+        self.live[model_id] = {"done": 0, "total": catalog.by_id(model_id).approx_bytes}
+        stream = Gio.DataInputStream.new(proc.get_stdout_pipe())
+
+        def on_line(src, res) -> None:
+            try:
+                line, _len = src.read_line_finish_utf8(res)
+            except GLib.Error:
+                line = None
+            if line is None:
+                return
+            try:
+                import json
+
+                self.live[model_id] = json.loads(line)
+            except ValueError:
+                pass
+            if self.editing is None:
+                self.render()
+            src.read_line_async(GLib.PRIORITY_DEFAULT, None, on_line)
+
+        def on_exit(p, res) -> None:
+            try:
+                p.wait_finish(res)
+            except GLib.Error:
+                pass
+            ok = p.get_exit_status() == 0
+            self.downloads.pop(model_id, None)
+            self.live.pop(model_id, None)
+            title = catalog.by_id(model_id).title
+            if ok and then:
+                then()
+            self.flash(f"{title} is ready" if ok else (f"{title}: paused" if p.get_exit_status() == 2
+                                                       else f"{title}: download failed (Models tab says why)"))
+
+        stream.read_line_async(GLib.PRIORITY_DEFAULT, None, on_line)
+        proc.wait_async(None, on_exit)
+        self.render()
+
+    def model_action(self, st: dict) -> None:
+        """Enter on a Models row: download (or resume / retry), or cancel a running download."""
+        if st["state"] == "downloading":
+            modelcmd.main(["cancel", st["id"]], models_dir=MODELS_DIR, cfg=self.dataclass_cfg())
+            self.flash(f"Pausing {st['title']}… Enter again resumes")
+        elif st["state"] != "ready":
+            self.start_download(st["id"])
+        else:
+            self.flash(f"{st['title']} is ready · D twice removes it")
+
+    def remove_model(self, st: dict) -> None:
+        import contextlib
+        import io
+
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            code = modelcmd.main(["remove", st["id"]], models_dir=MODELS_DIR, cfg=self.dataclass_cfg())
+        self.flash(f"Removed {st['title']}" if code == 0 else err.getvalue().strip())
+
+    def tick(self) -> bool:
+        """Every second: redraw the Models tab while anything downloads, even started elsewhere."""
+        if self.editing is None and self.capturing is None and (
+                self.downloads or (sm.TABS[self.tab] == "Models"
+                                   and any(s["state"] == "downloading" for s in self.model_states()))):
+            self.render()
+        return True
 
     # -- actions ----------------------------------------------------------------
     def save(self, key: str, value) -> None:
@@ -360,8 +565,8 @@ class Settings(Gtk.ApplicationWindow):
         it = self.items[self.index]
         if it.kind != "setting" or it.row.kind in ("text", "secret", "action", "shortcut"):
             return
-        if it.row.key == "elevenlabs_voice_id" and not self.eleven_voices:
-            self.flash("No voices yet: save a working ElevenLabs key first (it starts with sk_)")
+        if it.row.kind == "voice":
+            self.change_voice(sm.step(it.row, self.value_of(it.row), direction))
             return
         new = sm.step(it.row, self.value_of(it.row), direction)
         if new != self.value_of(it.row):
@@ -375,10 +580,44 @@ class Settings(Gtk.ApplicationWindow):
                 self.save("response_speed", sm.speed_of(self.values))
             if it.row.key == "brain":
                 self.save("brain_model", "")  # the old model name belongs to the old brain
+            if it.row.key == "whisper_device" and new == "auto" and shutil.which("nvidia-smi"):
+                self.get_accurate()
+        self.render()
+
+    def get_accurate(self) -> None:
+        """Accurate needs Large v3 Turbo and GPU support; fetch whatever is missing."""
+        for model_id in ("gpu", "whisper-large-turbo"):
+            if self.model_state(model_id)["state"] != "ready":
+                self.start_download(model_id)
+
+    def change_voice(self, choice: str) -> None:
+        """A downloaded (or cloud) voice is saved at once; one that needs a download waits for Enter."""
+        model_id = self.voice_model(choice)
+        if model_id and self.model_state(model_id)["state"] != "ready":
+            self.pending_voice = choice  # shown, not saved: Rum keeps the current voice
+        else:
+            self.pending_voice = None
+            for key, value in sm.voice_updates(choice).items():
+                self.save(key, value)
+            if choice.startswith("elevenlabs:"):
+                self.check_elevenlabs()
         self.render()
 
     def activate(self) -> None:
         it = self.items[self.index]
+        if it.kind == "model":
+            self.model_action(it.data)
+            return
+        if it.kind == "setting" and it.row.kind == "voice":
+            choice = self.pending_voice
+            if choice and self.voice_model(choice):
+                self.start_download(self.voice_model(choice), then=lambda c=choice: self.change_voice(c))
+            else:
+                self.change_voice(sm.step(it.row, self.value_of(it.row), +1))
+            return
+        if it.kind == "setting" and it.row.key == "whisper_device" and self.processing_note().startswith("needs"):
+            self.get_accurate()
+            return
         if it.kind == "setting" and it.row.kind in ("text", "secret", "model"):
             self.start_edit(it.row)
         elif it.kind == "setting" and it.row.kind == "shortcut":
@@ -495,6 +734,17 @@ class Settings(Gtk.ApplicationWindow):
 
     def press_d(self) -> None:
         it = self.items[self.index]
+        if it.kind == "model":
+            token = f"remove:{it.data['id']}"
+            if it.data["state"] != "ready":
+                self.flash(f"{it.data['title']} isn't downloaded")
+            elif self.armed == token:
+                self.armed = None
+                self.remove_model(it.data)
+            else:
+                self.armed = token
+                self.flash(f"Press D again to remove {it.data['title']}")
+            return
         if it.kind == "fact":
             token = f"forget:{it.data}"
             if self.armed == token:
@@ -547,6 +797,7 @@ class Settings(Gtk.ApplicationWindow):
         pos = selectable.index(self.index) if self.index in selectable else 0
         self.index = selectable[max(0, min(len(selectable) - 1, pos + direction))]
         self.armed = None
+        self.pending_voice = None
         self.render()
 
     def switch_tab(self, i: int) -> None:

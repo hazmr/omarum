@@ -225,3 +225,37 @@ def speed_of(values: dict) -> str:
         if all(values.get(k) == v for k, v in preset.items()):
             return name
     return "custom"
+
+
+def human_size(n: int) -> str:
+    if not n:
+        return "—"
+    if n >= 1_000_000_000:
+        return f"{n / 1_000_000_000:.1f} GB"
+    return f"{round(n / 1_000_000)} MB"
+
+
+def model_status(s: dict) -> str:
+    """The Models tab's state text for one model (from `omarum models list --json`)."""
+    state, done, total = s.get("state"), int(s.get("done") or 0), int(s.get("total") or 0)
+    if state == "ready":
+        return "✓ Ready" + ("  (in use)" if s.get("in_use") else "")
+    if state == "downloading":
+        pct = round(done * 100 / total) if total else 0
+        return f"↓ {pct}%  {human_size(done)} of {human_size(total)}"
+    if state == "partial":
+        return f"Paused  {human_size(done)} of {human_size(total)}"
+    if state == "failed":
+        return f"✗ Failed: {s.get('error') or 'unknown error'}  Enter to retry"
+    return "↓ Download"
+
+
+def shown_value(r: Row, values: dict):
+    """The value a row shows, mapping settings saved before the redesign onto today's buttons."""
+    value = values.get(r.key)
+    if r.key == "whisper_device" and value == "cuda":
+        return "auto"  # GPU only → Accurate
+    if r.key == "response_speed" and value not in SPEED_PRESETS:
+        wait = float(values.get("vad_stop_secs", 0.5))
+        return min(SPEED_PRESETS, key=lambda n: abs(SPEED_PRESETS[n]["vad_stop_secs"] - wait))
+    return value
