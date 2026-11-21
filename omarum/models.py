@@ -50,8 +50,17 @@ def cuda_libs_loadable(loader=None) -> bool:
     return True
 
 
+ACCURATE_CPU_MODEL = "small.en"  # Accurate while the GPU belongs to Rum's ZONOS3 voice
+
+
 def pick_whisper(cfg, cuda_devices: int | None = None, cuda_libs: bool | None = None) -> tuple[str, str, str]:
-    """(model, device, compute_type): the big model on a working GPU, a small one on the CPU."""
+    """(model, device, compute_type): the big model on a working GPU, a small one on the CPU.
+
+    Rum's own voice comes first: with ZONOS3 (which runs on the GPU) Accurate uses Whisper Small on
+    the CPU, because Large beside ZONOS3 and other apps left the voice without memory mid-sentence.
+    """
+    if cfg.whisper_device in ("auto", "cuda") and cfg.voice_primary == "zonos3":
+        return (ACCURATE_CPU_MODEL, "cpu", "int8")
     if cuda_devices is None:
         import ctranslate2
 

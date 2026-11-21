@@ -477,14 +477,22 @@ class Settings(Gtk.ApplicationWindow):
             return ""
         return self.progress(model_id) or f"({sm.human_size(st['size'])} · Enter to download)"
 
+    def accurate_models(self) -> tuple[str, ...]:
+        """What Accurate needs: Whisper Small on the CPU beside the ZONOS3 voice (which needs the
+        GPU), otherwise Whisper Large on the GPU (see models.pick_whisper)."""
+        if self.values.get("voice_primary") == "zonos3":
+            return ("whisper-small",)
+        return ("gpu", "whisper-large-turbo")
+
     def processing_note(self) -> str:
         if self.values.get("whisper_device") not in ("auto", "cuda"):
             return ""
-        if not shutil.which("nvidia-smi"):
+        zonos3 = self.values.get("voice_primary") == "zonos3"
+        if not zonos3 and not shutil.which("nvidia-smi"):
             return "no NVIDIA GPU: Rum uses Fast"
-        missing = [i for i in ("gpu", "whisper-large-turbo") if self.model_state(i)["state"] != "ready"]
+        missing = [i for i in self.accurate_models() if self.model_state(i)["state"] != "ready"]
         if not missing:
-            return ""
+            return "Whisper Small on the CPU: the GPU is kept for the ZONOS3 voice" if zonos3 else ""
         running = [self.progress(i) for i in missing if self.progress(i)]
         if running:
             return "downloading " + running[0].lstrip("↓ ") + " · Rum uses Fast until it's ready"
@@ -594,13 +602,13 @@ class Settings(Gtk.ApplicationWindow):
                 self.save("response_speed", sm.speed_of(self.values))
             if it.row.key == "brain":
                 self.save("brain_model", "")  # the old model name belongs to the old brain
-            if it.row.key == "whisper_device" and new == "auto" and shutil.which("nvidia-smi"):
+            if it.row.key == "whisper_device" and new == "auto":
                 self.get_accurate()
         self.render()
 
     def get_accurate(self) -> None:
         """Accurate needs Large v3 Turbo and GPU support; fetch whatever is missing."""
-        for model_id in ("gpu", "whisper-large-turbo"):
+        for model_id in self.accurate_models():
             if self.model_state(model_id)["state"] != "ready":
                 self.start_download(model_id)
 

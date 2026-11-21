@@ -93,3 +93,8 @@ def test_setup_downloads_whisper_through_the_catalog(tmp_path, monkeypatch):
                         lambda m, models_dir, files, emit, cancelled: got.append((m.id, [f.path for f in files])))
     setup._download_whisper("base.en", tmp_path / "whisper" / "base.en")
     assert got[0][0] == "whisper-base" and "model.bin" in got[0][1]
+
+
+def test_in_use_with_zonos3_and_accurate_is_whisper_small():
+    used = modelcmd.in_use(Config(whisper_device="auto", voice_primary="zonos3"))
+    assert "whisper-small" in used and "whisper-large-turbo" not in used and "gpu" not in used

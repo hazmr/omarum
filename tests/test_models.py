@@ -220,3 +220,47 @@ async def test_whisper_records_exactly_the_held_audio(monkeypatch):
     assert calls == ["start", "stop"] and not stt.keyed
     await stt.key_up()  # a stray release does nothing
     assert calls == ["start", "stop"]
+
+
+def test_accurate_leaves_the_gpu_to_the_zonos3_voice():
+    """Seen 2026-11-21 14:57: Whisper Large on the GPU starved ZONOS3, so Rum's voice kept switching."""
+    from omarum import models
+    from omarum.config import Config
+
+    assert models.pick_whisper(Config(whisper_device="auto", voice_primary="zonos3"),
+                               cuda_devices=1, cuda_libs=True) == ("small.en", "cpu", "int8")
+    assert models.pick_whisper(Config(whisper_device="cuda", voice_primary="zonos3"),
+                               cuda_devices=1, cuda_libs=True)[1] == "cpu"
+    assert models.pick_whisper(Config(whisper_device="auto", voice_primary="kokoro"),
+                               cuda_devices=1, cuda_libs=True)[1] == "cuda"
+    assert models.pick_whisper(Config(whisper_device="cpu", voice_primary="zonos3"),
+                               cuda_devices=1, cuda_libs=True) == ("base.en", "cpu", "int8")
+
+
+async def test_any_cuda_failure_falls_back_to_the_cpu_model(monkeypatch):
+    """Seen 14:59: 'parallel_for failed: cudaErrorInvalidDevice' slipped past the out-of-memory check."""
+    import numpy as np
+
+    from omarum import pipeline
+    from pipecat.frames.frames import TranscriptionFrame
+
+    class Seg:
+        text, no_speech_prob = "still here", 0.0
+
+    class Broken:
+        supported_languages = None
+
+        def transcribe(self, *a, **k):
+            raise RuntimeError("parallel_for failed: cudaErrorInvalidDevice: invalid device ordinal")
+
+    class CPU:
+        supported_languages = None
+
+        def transcribe(self, *a, **k):
+            return iter([Seg()]), None
+
+    monkeypatch.setattr(pipeline, "cached_whisper_model", lambda n, device, c: Broken() if device == "cuda" else CPU())
+    stt = pipeline.KeptWhisper(settings=pipeline.WhisperSTTService.Settings(model="x"), device="cuda",
+                               compute_type="int8_float16", fallback_model="base.en")
+    frames = [f async for f in stt.run_stt(np.zeros(16000, np.int16).tobytes())]
+    assert any(isinstance(f, TranscriptionFrame) for f in frames) and stt._device == "cpu"

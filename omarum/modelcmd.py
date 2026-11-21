@@ -21,7 +21,9 @@ VOICE_MODELS = {"kokoro": "kokoro", "piper": "piper-amy"}
 def in_use(cfg) -> set[str]:
     """Models Rum needs with these settings: never removed from the window."""
     used = {"whisper-base"}
-    if cfg.whisper_device in ("auto", "cuda"):
+    if cfg.whisper_device in ("auto", "cuda") and cfg.voice_primary == "zonos3":
+        used.add("whisper-small")  # the GPU is left to the voice (models.pick_whisper)
+    elif cfg.whisper_device in ("auto", "cuda"):
         used |= {"whisper-large-turbo", "gpu"}
     elif cfg.whisper_cpu_model == "small.en":
         used.add("whisper-small")

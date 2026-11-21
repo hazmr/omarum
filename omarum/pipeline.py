@@ -39,6 +39,12 @@ Emit = Callable[[dict], None]
 
 
 
+
+def _gpu_failure(exc: Exception) -> bool:
+    """A CUDA error (out of memory, a GPU another app reset, ...), not a bug in the audio."""
+    msg = str(exc).lower()
+    return any(k in msg for k in ("cuda", "out of memory", "parallel_for", "cublas"))
+
 class KeptWhisper(WhisperSTTService):
     """Pipecat's Whisper, but the model stays loaded between conversations, and a GPU that runs
     out of memory mid-conversation (another app filled it) hands over to the CPU model."""
@@ -82,9 +88,10 @@ class KeptWhisper(WhisperSTTService):
                 yield frame
             return
         except RuntimeError as exc:
-            if self._device != "cuda" or "out of memory" not in str(exc) or not self._fallback_model:
+            if self._device != "cuda" or not self._fallback_model or not _gpu_failure(exc):
                 raise
-        logger.warning(f"whisper: the GPU is full (another app is using it); using {self._fallback_model} on cpu")
+            why = str(exc)[:80]  # `exc` is gone once this block ends
+        logger.warning(f"whisper: the GPU failed ({why}); using {self._fallback_model} on cpu")
         self._device, self._compute_type = "cpu", "int8"
         self._model = cached_whisper_model(self._fallback_model, "cpu", "int8")
         async for frame in super().run_stt(audio):
